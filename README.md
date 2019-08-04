@@ -37,3 +37,15 @@ Question 4
 4. At some point, some clients uploaded non-compliant video's and which created a huge marketing issue. The client
 now wants to screen the uploaded video's before putting them online, but with minimal costs.
 Alter your architecture to be able to screen and process these video's.
+
+Amazon S3 provide read-after-write consistancy for PUTs to new objects (new key). 
+Response (Get after overwrite PUT (PUT to an existing key)) changes the existing object so that a subsequent GET may fetch the previous and inconsistant object.
+I configured the S3 Bucket policy and CORS Configaration to enable GET,POST and PUT methods.
+I also designed a PHP page to upload the videos to S3 , however I am getting error while S3Client in the PHP page.
+Refer to Bucket.php for code.
+Solution 1 :We can set up logic in the PUT call to check the video consitancy of the video.
+Solution 2: I researched and found the S3 comes with Python API distribution.
+Hence I have designed a program which can be scheduled from the Web Server (CRON JOB),
+This program navigates to the S3 instance , lists down the files uploaded and filters out the 
+files which dnot contain .Mp4 and .3GP extension.Once the report is generated , the program can send a email to 
+group highlighting the incorrect files uploaded.
