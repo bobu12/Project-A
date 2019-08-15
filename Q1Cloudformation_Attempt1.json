@@ -1,0 +1,361 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "AWS CloudFormation showing a highly-available, RDS DBInstance with a  read replica.",
+    "Parameters": {
+        "DBName": {
+            "Default": "RDSWB",
+            "Description": "RDSWB",
+            "Type": "String",
+            "MinLength": "1",
+            "MaxLength": "64",
+            "AllowedPattern": "[a-zA-Z][a-zA-Z0-9]*",
+            "ConstraintDescription": "must begin with a letter and contain only alphanumeric characters."
+        },
+        "DBUser": {
+            "NoEcho": "true",
+            "Description": "admin",
+            "Type": "String",
+            "MinLength": "1",
+            "MaxLength": "16",
+            "AllowedPattern": "[a-zA-Z][a-zA-Z0-9]*",
+            "ConstraintDescription": "must begin with a letter and contain only alphanumeric characters."
+        },
+        "DBPassword": {
+            "NoEcho": "true",
+            "Description": "Welcome7890",
+            "Type": "String",
+            "MinLength": "1",
+            "MaxLength": "41",
+            "AllowedPattern": "[a-zA-Z0-9]+",
+            "ConstraintDescription": "must contain only alphanumeric characters."
+        },
+        "DBAllocatedStorage": {
+            "Default": "5",
+            "Description": "5",
+            "Type": "Number",
+            "MinValue": "4",
+            "MaxValue": "10",
+            "ConstraintDescription": "must be between 5 and 1024Gb."
+        },
+        "DBInstanceClass": {
+            "Description": "db.t2.small",
+            "Type": "String",
+            "Default": "db.t2.small",
+            "ConstraintDescription": "must select a valid database instance type."
+        },
+        "EC2SG": {
+            "Description": "EC2SG",
+            "Default": "default",
+            "Type": "String",
+            "AllowedPattern": "[a-zA-Z0-9\\-]+",
+            "ConstraintDescription": "must be a valid security group name."
+        },
+        "MultiAZ": {
+            "Description": "true",
+            "Type": "String",
+            "Default": "false",
+            "AllowedValues": [
+                "true",
+                "false"
+            ],
+            "ConstraintDescription": "must be true or false."
+        }
+    },
+    "Conditions": {
+        "Is-EC2-VPC": {
+            "Fn::Or": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "eu-central-1"
+                    ]
+                },
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "cn-north-1"
+                    ]
+                }
+            ]
+        },
+        "Is-EC2-Classic": {
+            "Fn::Not": [
+                {
+                    "Condition": "Is-EC2-VPC"
+                }
+            ]
+        }
+    },
+    "Resources": {
+        "DBSG": {
+            "Type": "AWS::RDS::DBSecurityGroup",
+            "Condition": "Is-EC2-Classic",
+            "Properties": {
+                "DBSecurityGroupIngress": [
+                    {
+                        "Ref": "EC2SG"
+                    },
+                    {
+                        "EC2SecurityGroupId": {
+                            "Ref": "VPCMaster"
+                        }
+                    },
+                    {
+                        "EC2SecurityGroupId": {
+                            "Ref": "VPCMaster"
+                        }
+                    }
+                ],
+                "GroupDescription": "database access"
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "a488c72f-4459-438e-b2e6-bf1c55d4f2f0"
+                }
+            }
+        },
+        "MasterDB": {
+            "Type": "AWS::RDS::DBInstance",
+            "Properties": {
+                "DBName": {
+                    "Ref": "DBName"
+                },
+                "AllocatedStorage": {
+                    "Ref": "DBAllocatedStorage"
+                },
+                "DBInstanceClass": {
+                    "Ref": "DBInstanceClass"
+                },
+                "Engine": "MySQL",
+                "MasterUsername": {
+                    "Ref": "DBUser"
+                },
+                "MasterUserPassword": {
+                    "Ref": "DBPassword"
+                },
+                "MultiAZ": {
+                    "Ref": "MultiAZ"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Master Database"
+                    }
+                ],
+                "DBSecurityGroups": [
+                    "Fn::If",
+                    {
+                        "Ref": "DBSG"
+                    }
+                ]
+            },
+            "DeletionPolicy": "Snapshot",
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "5c6147ad-6970-4b30-addb-840df348036c"
+                }
+            }
+        },
+        "ReplicaDB": {
+            "Type": "AWS::RDS::DBInstance",
+            "Properties": {
+                "SourceDBInstanceIdentifier": {
+                    "Ref": "MasterDB"
+                },
+                "DBInstanceClass": {
+                    "Ref": "DBInstanceClass"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Read Replica Database"
+                    }
+                ]
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "5c4f7774-e59c-40ca-afa4-41b1c175e002"
+                }
+            }
+        },
+        "VPCMaster": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {},
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "b5a37af4-a04b-47e1-be46-3302556e8d9c"
+                }
+            }
+        },
+        "IAMUSERA": {
+            "Type": "AWS::IAM::User",
+            "Properties": {},
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "41e9919b-dbf5-4268-acab-862e90d9e5ec"
+                }
+            },
+            "DependsOn": [
+                "DBSG"
+            ]
+        }
+    },
+    "Outputs": {
+        "EC2Platform": {
+            "Description": "Platform in which this stack is deployed",
+            "Value": {
+                "Fn::If": [
+                    "Is-EC2-VPC",
+                    "EC2-VPC",
+                    "EC2-Classic"
+                ]
+            }
+        },
+        "MasterJDBCConnectionString": {
+            "Description": "JDBC connection string for the master database",
+            "Value": {
+                "Fn::Join": [
+                    "",
+                    [
+                        "jdbc:mysql://",
+                        {
+                            "Fn::GetAtt": [
+                                "MasterDB",
+                                "Endpoint.Address"
+                            ]
+                        },
+                        ":",
+                        {
+                            "Fn::GetAtt": [
+                                "MasterDB",
+                                "Endpoint.Port"
+                            ]
+                        },
+                        "/",
+                        {
+                            "Ref": "DBName"
+                        }
+                    ]
+                ]
+            }
+        },
+        "ReplicaJDBCConnectionString": {
+            "Description": "JDBC connection string for the replica database",
+            "Value": {
+                "Fn::Join": [
+                    "",
+                    [
+                        "jdbc:mysql://",
+                        {
+                            "Fn::GetAtt": [
+                                "ReplicaDB",
+                                "Endpoint.Address"
+                            ]
+                        },
+                        ":",
+                        {
+                            "Fn::GetAtt": [
+                                "ReplicaDB",
+                                "Endpoint.Port"
+                            ]
+                        },
+                        "/",
+                        {
+                            "Ref": "DBName"
+                        }
+                    ]
+                ]
+            }
+        }
+    },
+    "Metadata": {
+        "AWS::CloudFormation::Designer": {
+            "a488c72f-4459-438e-b2e6-bf1c55d4f2f0": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -320,
+                    "y": 130
+                },
+                "z": 1,
+                "parent": "b5a37af4-a04b-47e1-be46-3302556e8d9c",
+                "embeds": [],
+                "iscontainedinside": [
+                    "b5a37af4-a04b-47e1-be46-3302556e8d9c",
+                    "b5a37af4-a04b-47e1-be46-3302556e8d9c",
+                    "b5a37af4-a04b-47e1-be46-3302556e8d9c",
+                    "b5a37af4-a04b-47e1-be46-3302556e8d9c"
+                ]
+            },
+            "5c6147ad-6970-4b30-addb-840df348036c": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -230,
+                    "y": 210
+                },
+                "z": 1,
+                "parent": "b5a37af4-a04b-47e1-be46-3302556e8d9c",
+                "embeds": [],
+                "isassociatedwith": [
+                    "a488c72f-4459-438e-b2e6-bf1c55d4f2f0"
+                ]
+            },
+            "5c4f7774-e59c-40ca-afa4-41b1c175e002": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -120,
+                    "y": 200
+                },
+                "z": 1,
+                "parent": "b5a37af4-a04b-47e1-be46-3302556e8d9c",
+                "embeds": [],
+                "isassociatedwith": [
+                    "5c6147ad-6970-4b30-addb-840df348036c"
+                ]
+            },
+            "b5a37af4-a04b-47e1-be46-3302556e8d9c": {
+                "size": {
+                    "width": 420,
+                    "height": 270
+                },
+                "position": {
+                    "x": -390,
+                    "y": 30
+                },
+                "z": 0,
+                "embeds": [
+                    "a488c72f-4459-438e-b2e6-bf1c55d4f2f0",
+                    "5c6147ad-6970-4b30-addb-840df348036c",
+                    "5c4f7774-e59c-40ca-afa4-41b1c175e002"
+                ]
+            },
+            "41e9919b-dbf5-4268-acab-862e90d9e5ec": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -490,
+                    "y": 60
+                },
+                "z": 0,
+                "embeds": [],
+                "dependson": [
+                    "a488c72f-4459-438e-b2e6-bf1c55d4f2f0"
+                ]
+            }
+        }
+    }
+}
