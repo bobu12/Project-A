@@ -39,6 +39,28 @@ customers the opportunity to upload videos with their reviews. They want to stor
 processing, and they want to show thumbnails of the videos underneath the product pages.
 Alter your architecture to process and store these videos.
 
+Comments -
+They want to store the thumbnails and videos for later processing, and they want to show thumbnails of the videos underneath the product pages.
+Alter your architecture to process and store these videos.
+ 
+Here there should be a source bucket and a target backet.
+The user should upload the videos in the S3 bucket (source folder) and a lamda python function can run to genrate the
+thubnails of the video files <name of the thubnails prefiexed with the video name and move them to Target folder>.
+
+For storing the video there should be a S3 bucket.
+For Processing the files there should be a lamda function with Create objects trigger so that
+
+For each product page the video should be picked up fronm the source location and the respective thubnails should be picked up from the target folder in S3 containing the 
+thubnails.
+How to design the product WebPage
+We have to design a Event-Driven Data Ingestion with AWS Lambda (S3 to RDS)
+In the RDS we can have two tables
+     A) Prod_Specification table containing the productid ,Video,Thubnail column <Product id primary key >
+	    the video and Thubnail column contains the S3 directory paths.
+     B) User_Comment_Prod table containing the Productid, userName,Comment (prodcutid NotNull and references product_Specification table).
+        Prod_Specification gets written when a user uploads a video in particular product webpage.
+		
+
 Question 4
 ----------
 4. At some point, some clients uploaded non-compliant video's and which created a huge marketing issue. The client
