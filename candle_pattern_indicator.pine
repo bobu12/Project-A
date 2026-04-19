@@ -1,0 +1,171 @@
+//@version=5
+indicator("Candle Pattern Indicator (1/2/3-bar)", shorttitle="CPI", overlay=true, max_labels_count=500)
+
+// ===== Display Inputs =====
+grpDisp   = "Display"
+bullColor = input.color(color.new(color.green, 0), "Bullish Color", group=grpDisp)
+bearColor = input.color(color.new(color.red, 0),   "Bearish Color", group=grpDisp)
+neutColor = input.color(color.new(color.gray, 0),  "Neutral Color", group=grpDisp)
+labelSize = input.string("small", "Label Size", options=["tiny","small","normal","large"], group=grpDisp)
+useShort  = input.bool(true, "Use short abbreviations (e.g. 'BE' vs 'Bull Engulf')", group=grpDisp)
+
+// ===== Pattern Toggles =====
+grp1 = "Single-Candle Patterns"
+showDoji      = input.bool(true, "Doji",             group=grp1)
+showHammer    = input.bool(true, "Hammer",           group=grp1)
+showInvHammer = input.bool(true, "Inverted Hammer",  group=grp1)
+showShooting  = input.bool(true, "Shooting Star",    group=grp1)
+showHanging   = input.bool(true, "Hanging Man",      group=grp1)
+showBullMaru  = input.bool(true, "Bullish Marubozu", group=grp1)
+showBearMaru  = input.bool(true, "Bearish Marubozu", group=grp1)
+
+grp2 = "Two-Candle Patterns"
+showBullEng   = input.bool(true, "Bullish Engulfing", group=grp2)
+showBearEng   = input.bool(true, "Bearish Engulfing", group=grp2)
+showBullHar   = input.bool(true, "Bullish Harami",    group=grp2)
+showBearHar   = input.bool(true, "Bearish Harami",    group=grp2)
+showPiercing  = input.bool(true, "Piercing Line",     group=grp2)
+showDarkCloud = input.bool(true, "Dark Cloud Cover",  group=grp2)
+showTweezerTp = input.bool(true, "Tweezer Top",       group=grp2)
+showTweezerBt = input.bool(true, "Tweezer Bottom",    group=grp2)
+
+grp3 = "Three-Candle Patterns"
+showMorning   = input.bool(true, "Morning Star",         group=grp3)
+showEvening   = input.bool(true, "Evening Star",         group=grp3)
+showWSoldiers = input.bool(true, "Three White Soldiers", group=grp3)
+showBCrows    = input.bool(true, "Three Black Crows",    group=grp3)
+showInsideUp  = input.bool(true, "Three Inside Up",      group=grp3)
+showInsideDn  = input.bool(true, "Three Inside Down",    group=grp3)
+
+// ===== Thresholds =====
+grpThr = "Thresholds"
+dojiPct   = input.float(0.10, "Doji body/range ratio",   minval=0.01, maxval=0.5, step=0.01, group=grpThr)
+wickMult  = input.float(2.0,  "Hammer wick/body ratio",  minval=1.0,  maxval=5.0, step=0.1,  group=grpThr)
+maruPct   = input.float(0.05, "Marubozu wick/range ratio (max)", minval=0.0, maxval=0.2, step=0.01, group=grpThr)
+trendLen  = input.int(10, "Trend SMA length", minval=2, maxval=100, group=grpThr)
+
+// ===== Helpers =====
+body      = math.abs(close - open)
+rng       = high - low
+upperWick = high - math.max(open, close)
+lowerWick = math.min(open, close) - low
+isBull    = close > open
+isBear    = close < open
+safeRng   = rng == 0 ? syminfo.mintick : rng
+safeBody  = body == 0 ? syminfo.mintick : body
+
+sma    = ta.sma(close, trendLen)
+upTrend   = close > sma and sma > sma[1]
+downTrend = close < sma and sma < sma[1]
+
+// ===== Single-Candle Patterns =====
+doji      = body <= rng * dojiPct
+
+hammerShape = lowerWick >= body * wickMult and upperWick <= body * 0.4 and body > 0
+hammer      = hammerShape and not upTrend
+hangingMan  = hammerShape and upTrend
+
+invShape       = upperWick >= body * wickMult and lowerWick <= body * 0.4 and body > 0
+invertedHammer = invShape and not upTrend
+shootingStar   = invShape and upTrend
+
+bullMarubozu = isBull and upperWick <= rng * maruPct and lowerWick <= rng * maruPct and body >= rng * 0.9
+bearMarubozu = isBear and upperWick <= rng * maruPct and lowerWick <= rng * maruPct and body >= rng * 0.9
+
+// ===== Two-Candle Patterns =====
+prevBull = close[1] > open[1]
+prevBear = close[1] < open[1]
+
+bullEngulf = prevBear and isBull and close >= open[1] and open <= close[1] and body > math.abs(close[1] - open[1])
+bearEngulf = prevBull and isBear and open >= close[1] and close <= open[1] and body > math.abs(close[1] - open[1])
+
+bullHarami = prevBear and isBull and high <= open[1] and low >= close[1] and body < math.abs(close[1] - open[1])
+bearHarami = prevBull and isBear and high <= close[1] and low >= open[1] and body < math.abs(close[1] - open[1])
+
+prevMid    = (open[1] + close[1]) / 2
+piercing   = prevBear and isBull and open < low[1] and close > prevMid and close < open[1]
+darkCloud  = prevBull and isBear and open > high[1] and close < prevMid and close > open[1]
+
+tweezerTop = math.abs(high - high[1]) <= syminfo.mintick * 2 and prevBull and isBear
+tweezerBot = math.abs(low  - low[1])  <= syminfo.mintick * 2 and prevBear and isBull
+
+// ===== Three-Candle Patterns =====
+body2     = math.abs(close[2] - open[2])
+body1     = math.abs(close[1] - open[1])
+smallMid  = body1 <= body2 * 0.5
+
+morningStar = close[2] < open[2] and smallMid and isBull and close > (open[2] + close[2]) / 2
+eveningStar = close[2] > open[2] and smallMid and isBear and close < (open[2] + close[2]) / 2
+
+threeWhiteSoldiers = isBull and close[1] > open[1] and close[2] > open[2] and close > close[1] and close[1] > close[2] and open <= close[1] and open >= open[1] and open[1] <= close[2] and open[1] >= open[2]
+threeBlackCrows    = isBear and close[1] < open[1] and close[2] < open[2] and close < close[1] and close[1] < close[2] and open >= close[1] and open <= open[1] and open[1] >= close[2] and open[1] <= open[2]
+
+threeInsideUp   = close[2] < open[2] and (open[1] > close[2] and close[1] < open[2] and math.abs(close[1] - open[1]) < body2) and isBull and close > open[2]
+threeInsideDown = close[2] > open[2] and (open[1] < close[2] and close[1] > open[2] and math.abs(close[1] - open[1]) < body2) and isBear and close < open[2]
+
+// ===== Label Rendering =====
+sz = labelSize == "tiny"   ? size.tiny :
+     labelSize == "small"  ? size.small :
+     labelSize == "normal" ? size.normal : size.large
+
+drawBull(cond, shortTxt, longTxt) =>
+    if cond
+        label.new(bar_index, low, useShort ? shortTxt : longTxt, style=label.style_label_up, color=bullColor, textcolor=color.white, size=sz, yloc=yloc.belowbar)
+
+drawBear(cond, shortTxt, longTxt) =>
+    if cond
+        label.new(bar_index, high, useShort ? shortTxt : longTxt, style=label.style_label_down, color=bearColor, textcolor=color.white, size=sz, yloc=yloc.abovebar)
+
+drawNeutral(cond, shortTxt, longTxt) =>
+    if cond
+        label.new(bar_index, high, useShort ? shortTxt : longTxt, style=label.style_label_down, color=neutColor, textcolor=color.white, size=sz, yloc=yloc.abovebar)
+
+// Single
+drawNeutral(showDoji      and doji,           "D",   "Doji")
+drawBull(   showHammer    and hammer,         "H",   "Hammer")
+drawBull(   showInvHammer and invertedHammer, "IH",  "Inv Hammer")
+drawBear(   showShooting  and shootingStar,   "SS",  "Shoot Star")
+drawBear(   showHanging   and hangingMan,     "HM",  "Hang Man")
+drawBull(   showBullMaru  and bullMarubozu,   "BM",  "Bull Maru")
+drawBear(   showBearMaru  and bearMarubozu,   "RM",  "Bear Maru")
+
+// Two
+drawBull(showBullEng    and bullEngulf,  "BE",  "Bull Engulf")
+drawBear(showBearEng    and bearEngulf,  "SE",  "Bear Engulf")
+drawBull(showBullHar    and bullHarami,  "BH",  "Bull Harami")
+drawBear(showBearHar    and bearHarami,  "SH",  "Bear Harami")
+drawBull(showPiercing   and piercing,    "PL",  "Piercing")
+drawBear(showDarkCloud  and darkCloud,   "DC",  "Dark Cloud")
+drawBear(showTweezerTp  and tweezerTop,  "TT",  "Tweezer Top")
+drawBull(showTweezerBt  and tweezerBot,  "TB",  "Tweezer Bot")
+
+// Three
+drawBull(showMorning   and morningStar,        "MS",  "Morning Star")
+drawBear(showEvening   and eveningStar,        "ES",  "Evening Star")
+drawBull(showWSoldiers and threeWhiteSoldiers, "3WS", "3 W Soldiers")
+drawBear(showBCrows    and threeBlackCrows,    "3BC", "3 B Crows")
+drawBull(showInsideUp  and threeInsideUp,      "3IU", "3 Inside Up")
+drawBear(showInsideDn  and threeInsideDown,    "3ID", "3 Inside Dn")
+
+// ===== Alerts =====
+alertcondition(doji,              "Doji",              "Doji detected")
+alertcondition(hammer,            "Hammer",            "Hammer detected")
+alertcondition(invertedHammer,    "Inverted Hammer",   "Inverted Hammer detected")
+alertcondition(shootingStar,      "Shooting Star",     "Shooting Star detected")
+alertcondition(hangingMan,        "Hanging Man",       "Hanging Man detected")
+alertcondition(bullMarubozu,      "Bullish Marubozu",  "Bullish Marubozu detected")
+alertcondition(bearMarubozu,      "Bearish Marubozu",  "Bearish Marubozu detected")
+alertcondition(bullEngulf,        "Bullish Engulfing", "Bullish Engulfing detected")
+alertcondition(bearEngulf,        "Bearish Engulfing", "Bearish Engulfing detected")
+alertcondition(bullHarami,        "Bullish Harami",    "Bullish Harami detected")
+alertcondition(bearHarami,        "Bearish Harami",    "Bearish Harami detected")
+alertcondition(piercing,          "Piercing Line",     "Piercing Line detected")
+alertcondition(darkCloud,         "Dark Cloud Cover",  "Dark Cloud Cover detected")
+alertcondition(tweezerTop,        "Tweezer Top",       "Tweezer Top detected")
+alertcondition(tweezerBot,        "Tweezer Bottom",    "Tweezer Bottom detected")
+alertcondition(morningStar,       "Morning Star",      "Morning Star detected")
+alertcondition(eveningStar,       "Evening Star",      "Evening Star detected")
+alertcondition(threeWhiteSoldiers,"Three White Soldiers","Three White Soldiers detected")
+alertcondition(threeBlackCrows,   "Three Black Crows", "Three Black Crows detected")
+alertcondition(threeInsideUp,     "Three Inside Up",   "Three Inside Up detected")
+alertcondition(threeInsideDown,   "Three Inside Down", "Three Inside Down detected")
