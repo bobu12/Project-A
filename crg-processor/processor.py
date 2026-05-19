@@ -68,11 +68,7 @@ def load_config(path: Path) -> Config:
 
 
 def extract_text_native(pdf_path: Path, poppler_path: str) -> str:
-    """Fast path: pull embedded text from page 1 with pdftotext."""
-    from pdfminer.high_level import extract_text  # local import keeps batch startup snappy
-
-    # pdfminer doesn't need poppler, but if Poppler's pdftotext is present we prefer it
-    # because it is much faster on multi-MB scans. We try it first via subprocess.
+    """Fast path: pull embedded text from page 1 with pdftotext, fallback to pdfminer."""
     pdftotext = _which_pdftotext(poppler_path)
     if pdftotext:
         import subprocess
@@ -81,14 +77,19 @@ def extract_text_native(pdf_path: Path, poppler_path: str) -> str:
                 [pdftotext, "-f", "1", "-l", "1", "-layout", str(pdf_path), "-"],
                 capture_output=True, text=True, timeout=20, check=False,
             )
-            if result.returncode == 0 and result.stdout.strip():
+            if result.returncode == 0:
+                # Return whatever pdftotext produced (empty string for image-only
+                # scans). Falling through to pdfminer would be redundant since
+                # both read embedded text — if pdftotext sees nothing, pdfminer
+                # will too. Skip straight to OCR.
                 return result.stdout
         except (subprocess.TimeoutExpired, OSError) as exc:
             LOG.debug("pdftotext failed for %s: %s", pdf_path.name, exc)
 
     try:
+        from pdfminer.high_level import extract_text
         return extract_text(str(pdf_path), maxpages=1) or ""
-    except Exception as exc:  # pdfminer raises a wide range of errors on bad PDFs
+    except BaseException as exc:  # catches pyo3 panics from broken cryptography installs
         LOG.debug("pdfminer failed for %s: %s", pdf_path.name, exc)
         return ""
 
@@ -115,7 +116,12 @@ def extract_text_ocr(pdf_path: Path, cfg: Config) -> str:
     images = convert_from_path(str(pdf_path), **kwargs)
     if not images:
         return ""
-    return pytesseract.image_to_string(images[0]) or ""
+    # PSM 6 (uniform block of text) reads CRG's table-heavy LPO forms
+    # reliably; the default PSM 3 mis-segments the top-right P.O No cell.
+    text = pytesseract.image_to_string(images[0], config="--psm 6") or ""
+    if not LPO_REGEX.search(text):
+        text += "\n" + (pytesseract.image_to_string(images[0], config="--psm 4") or "")
+    return text
 
 
 def extract_lpos(text: str) -> list[str]:
