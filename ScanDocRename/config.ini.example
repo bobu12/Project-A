@@ -1,0 +1,32 @@
+; ScanDocRename - CRG LPO Processor configuration
+; Copy this file to config.ini and adjust paths to match your VM.
+
+[paths]
+; INBOX is where the 10 scanners drop their PDFs. On this VM that is D:\D.
+inbox     = D:\D
+converted = D:\D\CONVERTED
+review    = D:\D\REVIEW
+logs      = D:\D\LOGS
+
+[settings]
+; Number of files processed in parallel. 4 is fine for most workloads.
+workers          = 4
+
+; Wait this many seconds for the file size to stop changing before reading it.
+; Prevents reading a half-written file from a slow scanner.
+stable_seconds   = 2
+
+; Hard cap on the stable-wait loop, in seconds.
+stable_timeout   = 60
+
+; DPI used when OCR fallback is needed. Raise to 400 if OCR misses digits.
+ocr_dpi          = 300
+
+; Only OCR the first N pages while searching for an LPO header.
+ocr_max_pages    = 3
+
+; Path to the Poppler bin folder (contains pdftotext.exe and pdfinfo.exe).
+poppler_path     = C:\poppler\Library\bin
+
+; Full path to the Tesseract executable.
+tesseract_cmd    = C:\Program Files\Tesseract-OCR\tesseract.exe

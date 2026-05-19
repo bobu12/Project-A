@@ -1,0 +1,6 @@
+config.ini
+*.pyc
+__pycache__/
+.pytest_cache/
+service.stdout.log
+service.stderr.log
