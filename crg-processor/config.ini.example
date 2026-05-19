@@ -1,0 +1,12 @@
+[paths]
+inbox     = \\FILESERVER\Scans\CRG
+converted = \\FILESERVER\Scans\CRG\CONVERTED
+review    = \\FILESERVER\Scans\CRG\REVIEW
+logs      = \\FILESERVER\Scans\CRG\LOGS
+
+[settings]
+workers        = 4
+stable_seconds = 2
+ocr_dpi        = 300
+poppler_path   = C:\poppler\Library\bin
+tesseract_cmd  = C:\Program Files\Tesseract-OCR\tesseract.exe
