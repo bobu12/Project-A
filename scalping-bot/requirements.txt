@@ -1,0 +1,8 @@
+# Backtest sandbox (Linux/macOS/Windows)
+pandas>=2.0
+numpy>=1.24
+openpyxl>=3.1
+
+# LIVE trading only — install on the Windows VPS that runs the MT5 terminal.
+# Not installable / not used in the backtest sandbox.
+# MetaTrader5>=5.0.45
