@@ -1,19 +1,24 @@
-"""Event-driven backtester + walk-forward re-optimizer.
+"""Event-driven backtester + walk-forward re-optimizer with RISK MANAGEMENT.
 
-Design choices that keep it honest:
-  * No look-ahead: a signal computed from bar i is entered at bar i+1's open.
-  * Costs are charged on every trade (spread + slippage per side, commission
-    round-turn). If the edge dies once costs are applied, the report shows it.
-  * Pessimistic tie-break: if a bar's range spans BOTH stop and target, we
-    assume the stop was hit first.
-  * Ruin stops the run: if equity hits 0 the account is blown and we halt.
+Risk model (this is the part you asked to fix):
+  * Position SIZING is risk-based. We compute the lot so that hitting the
+    INITIAL stop loses at most `risk_per_trade` of current equity. So the loss
+    on a stopped trade is capped (your "5% max SL") regardless of price level.
+    If even the broker minimum lot would exceed that cap, the trade is SKIPPED
+    rather than over-risked.
+  * Stops MOVE in your favour:
+      - move to BREAKEVEN once profit reaches `be_trigger_R` risk-units (R),
+      - then TRAIL `trail_R` R behind the best price reached.
+    Stops never move backwards. (Refs: trailing-stop / %-risk best practice.)
 
-The walk-forward loop is the real version of "backtest daily and improve its
-own accuracy": on each step it re-optimizes parameters on a trailing window,
-locks them, and trades the next (unseen) window. This guards against - but does
-NOT eliminate - overfitting, and never guarantees accuracy will improve.
+Integrity:
+  * No look-ahead: signal from bar i is entered at bar i+1's open. Trailing
+    updates take effect from the NEXT bar (we protect with the prior bar's
+    stop, then ratchet at bar close) - conservative, not optimistic.
+  * Pessimistic tie-break: if a bar spans both stop and target, stop wins.
+  * Ruin halts the run.
 """
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from itertools import product
 import numpy as np
 
@@ -23,134 +28,150 @@ from .strategy import add_indicators, signal
 @dataclass
 class Trade:
     symbol: str
-    side: str          # BUY / SELL
+    side: str
     entry_time: object
     entry: float
-    sl: float
+    sl: float          # INITIAL stop (the trail is recorded via exit/reason)
     tp: float
     exit_time: object
     exit: float
-    reason: str        # TP / SL / TIME
+    reason: str        # TP / SL / TRAIL / TIME
     lots: float
-    pnl: float         # net USD after costs
-    balance: float     # account balance after this trade
+    risk_usd: float    # dollars risked to the initial stop
+    pnl: float
+    balance: float
 
 
-def _warmup(params):
-    return max(params["lookback"], params["atr_period"]) + 1
+def _warmup(p):
+    return max(p["lookback"], p["atr_period"]) + 1
 
 
-def run_backtest(df, params, sym_cfg, start_balance, active_after=None):
-    """Run one parameter set over `df`. Returns (list[Trade], final_balance).
+def _size_lots(risk_money, r_distance, sym_cfg):
+    """Lots so that initial-stop loss ~= risk_money. Round DOWN to lot step so
+    we never exceed the cap. Returns 0.0 if even min lot would over-risk."""
+    contract = sym_cfg["contract_size"]
+    raw = risk_money / (r_distance * contract)
+    step = sym_cfg["lot_step"]
+    lots = np.floor(raw / step) * step
+    if lots < sym_cfg["min_lot"]:
+        min_risk = sym_cfg["min_lot"] * r_distance * contract
+        if min_risk <= risk_money:
+            return sym_cfg["min_lot"]
+        return 0.0                      # cannot size within risk cap -> skip
+    return round(lots, 4)
 
-    `active_after`: only OPEN new trades on bars with Date >= this timestamp
-    (used by walk-forward so the warmup bars before a test window don't trade).
-    """
+
+def run_backtest(df, params, sym_cfg, start_balance, risk_per_trade, active_after=None):
     d = add_indicators(df, params["lookback"], params["atr_period"]).reset_index(drop=True)
-
     dates = d["Date"].to_numpy()
-    o = d["open"].to_numpy(float)
-    h = d["high"].to_numpy(float)
-    low = d["low"].to_numpy(float)
-    c = d["close"].to_numpy(float)
-    z = d["z"].to_numpy(float)
-    atr = d["atr"].to_numpy(float)
+    o, h, low, c = (d[k].to_numpy(float) for k in ("open", "high", "low", "close"))
+    z, atr = d["z"].to_numpy(float), d["atr"].to_numpy(float)
     n = len(d)
 
     contract = sym_cfg["contract_size"]
-    lots = sym_cfg["lots"]
-    half_spread = sym_cfg["spread"] / 2.0
-    slip = sym_cfg["slippage"]
-    commission = sym_cfg["commission"] * lots
+    half_spread, slip = sym_cfg["spread"] / 2.0, sym_cfg["slippage"]
+    edge = half_spread + slip
     close_only = sym_cfg["close_only"]
-    edge = half_spread + slip  # adverse price adjustment per side
-
     active_after = np.datetime64(active_after) if active_after is not None else None
 
     balance = start_balance
-    trades = []
-    pos = None
+    trades, pos = [], None
     i = _warmup(params)
 
     while i < n - 1:
         if pos is None:
             if active_after is not None and dates[i] < active_after:
-                i += 1
-                continue
+                i += 1; continue
             sig = signal(z[i], params["entry_z"])
-            if sig != 0 and not np.isnan(atr[i]) and atr[i] > 0:
-                j = i + 1                       # enter at NEXT bar
+            if sig and not np.isnan(atr[i]) and atr[i] > 0:
+                j = i + 1
                 ref = c[j] if close_only else o[j]
                 side = sig
-                entry = ref + side * edge       # buy pays up, sell sells down
-                if side == 1:
-                    sl = entry - params["sl_atr"] * atr[i]
-                    tp = entry + params["tp_atr"] * atr[i]
-                else:
-                    sl = entry + params["sl_atr"] * atr[i]
-                    tp = entry - params["tp_atr"] * atr[i]
-                pos = {"side": side, "entry": entry, "sl": sl, "tp": tp,
-                       "etime": dates[j], "opened": j}
-                i = j
-                continue
-            i += 1
-            continue
+                entry = ref + side * edge
+                r_dist = params["sl_atr"] * atr[i]            # R = initial risk distance
+                sl = entry - side * r_dist
+                tp = entry + side * params["tp_atr"] * atr[i]
+                lots = _size_lots(risk_per_trade * balance, r_dist, sym_cfg)
+                if lots <= 0:                                  # can't size within risk -> skip
+                    i += 1; continue
+                pos = {"side": side, "entry": entry, "sl": sl, "sl_init": sl,
+                       "tp": tp, "R": r_dist, "best": entry, "be": False,
+                       "opened": j, "lots": lots, "etime": dates[j]}
+                i = j; continue
+            i += 1; continue
 
-        # manage open position on bar i
-        side = pos["side"]
+        # --- manage open position on bar i (protect with prior stop first) ---
+        side, sl, tp = pos["side"], pos["sl"], pos["tp"]
         if close_only:
             px = c[i]
-            hit_sl = px <= pos["sl"] if side == 1 else px >= pos["sl"]
-            hit_tp = px >= pos["tp"] if side == 1 else px <= pos["tp"]
+            hit_sl = px <= sl if side == 1 else px >= sl
+            hit_tp = px >= tp if side == 1 else px <= tp
         else:
             if side == 1:
-                hit_sl, hit_tp = low[i] <= pos["sl"], h[i] >= pos["tp"]
+                hit_sl, hit_tp = low[i] <= sl, h[i] >= tp
             else:
-                hit_sl, hit_tp = h[i] >= pos["sl"], low[i] <= pos["tp"]
+                hit_sl, hit_tp = h[i] >= sl, low[i] <= tp
 
         reason = exit_ref = None
-        if hit_sl:                              # pessimistic: stop wins ties
-            reason, exit_ref = "SL", pos["sl"]
+        if hit_sl:
+            # was the stop already trailed past breakeven? label TRAIL vs SL
+            reason = "TRAIL" if pos["be"] else "SL"
+            exit_ref = sl
         elif hit_tp:
-            reason, exit_ref = "TP", pos["tp"]
+            reason, exit_ref = "TP", tp
         elif (i - pos["opened"]) >= params["max_hold"]:
             reason, exit_ref = "TIME", c[i]
 
         if reason:
-            exit_fill = exit_ref - side * edge  # exit also crosses costs
+            exit_fill = exit_ref - side * edge
+            lots = pos["lots"]
             gross = (exit_fill - pos["entry"]) * contract * lots * side
-            net = gross - commission
+            net = gross - sym_cfg["commission"] * lots
             balance += net
             trades.append(Trade(
                 symbol=sym_cfg["name"], side="BUY" if side == 1 else "SELL",
                 entry_time=pos["etime"], entry=round(pos["entry"], 2),
-                sl=round(pos["sl"], 2), tp=round(pos["tp"], 2),
-                exit_time=dates[i], exit=round(exit_fill, 2), reason=reason,
-                lots=lots, pnl=round(net, 2), balance=round(balance, 2)))
+                sl=round(pos["sl_init"], 2),
+                tp=round(tp, 2), exit_time=dates[i], exit=round(exit_fill, 2),
+                reason=reason, lots=lots,
+                risk_usd=round(pos["R"] * contract * lots, 2),
+                pnl=round(net, 2), balance=round(balance, 2)))
             pos = None
-            if balance <= 0:                    # ruin
+            if balance <= 0:
                 break
+            i += 1; continue
+
+        # --- ratchet the stop at bar close (takes effect next bar) ---
+        ext = h[i] if side == 1 else low[i]
+        if close_only:
+            ext = c[i]
+        pos["best"] = max(pos["best"], ext) if side == 1 else min(pos["best"], ext)
+        profit_dist = (pos["best"] - pos["entry"]) * side
+        if not pos["be"] and profit_dist >= params["be_trigger_R"] * pos["R"]:
+            be = pos["entry"] + side * (half_spread)          # ~breakeven incl. half-spread
+            pos["sl"] = max(pos["sl"], be) if side == 1 else min(pos["sl"], be)
+            pos["be"] = True
+        if pos["be"]:
+            trail = pos["best"] - side * params["trail_R"] * pos["R"]
+            pos["sl"] = max(pos["sl"], trail) if side == 1 else min(pos["sl"], trail)
         i += 1
 
     return trades, balance
 
 
 def _score(trades):
-    """Optimization objective for the training window: net PnL, but require a
-    minimum number of trades so we don't pick a fluke single winner."""
     if len(trades) < 5:
         return -1e9
     return sum(t.pnl for t in trades)
 
 
-def _grid(grid_cfg):
-    keys = list(grid_cfg)
-    for combo in product(*(grid_cfg[k] for k in keys)):
+def _grid(g):
+    keys = list(g)
+    for combo in product(*(g[k] for k in keys)):
         yield dict(zip(keys, combo))
 
 
-def walk_forward(df, sym_cfg, grid_cfg, wf_cfg, start_balance):
-    """Rolling re-optimization. Returns (oos_trades, final_balance, param_log)."""
+def walk_forward(df, sym_cfg, grid_cfg, wf_cfg, start_balance, risk_per_trade):
     train_n, test_n = wf_cfg["train"], wf_cfg["test"]
     combos = list(_grid(grid_cfg))
     balance = start_balance
@@ -159,21 +180,17 @@ def walk_forward(df, sym_cfg, grid_cfg, wf_cfg, start_balance):
     i = train_n
     while i + test_n <= len(df) and balance > 0:
         train = df.iloc[i - train_n:i]
-        # pick params by best net PnL on the trailing (in-sample) window
         best_p, best_s = None, -1e18
         for p in combos:
-            t, _ = run_backtest(train, p, sym_cfg, start_balance=10_000.0)
+            t, _ = run_backtest(train, p, sym_cfg, 10_000.0, risk_per_trade)
             s = _score(t)
             if s > best_s:
                 best_s, best_p = s, p
 
-        # trade the NEXT (out-of-sample) window with locked params. We feed the
-        # warmup bars before the window so indicators are valid, but only allow
-        # entries from the window start onward (active_after).
         warm = _warmup(best_p)
         seg = df.iloc[max(0, i - warm):i + test_n]
         active_after = df.iloc[i]["Date"]
-        t, balance = run_backtest(seg, best_p, sym_cfg, start_balance=balance,
+        t, balance = run_backtest(seg, best_p, sym_cfg, balance, risk_per_trade,
                                   active_after=active_after)
         oos_trades.extend(t)
         param_log.append({"from": active_after, **best_p, "is_score": round(best_s, 2)})

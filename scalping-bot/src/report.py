@@ -51,6 +51,7 @@ _TRADE_COLS = {
     "exit_time": "Exit Time",
     "reason": "Exit Reason",
     "lots": "Lots",
+    "risk_usd": "Risk $",
     "pnl": "P/L $",
     "balance": "Balance $",
 }
@@ -68,10 +69,11 @@ DISCLAIMER = [
     ("WHAT THIS IS", "A walk-forward backtest of a z-score mean-reversion strategy on REAL historical data."),
     ("WHAT THIS IS NOT", "A prediction, a guarantee, or evidence the strategy will make money live. It is not advice."),
     ("", ""),
-    ("XAUUSD data", "Real M15 OHLC from ejtraderLabs/historical-data (GitHub). Coverage ends 2022-03. 'Last year' = most recent real year available in-sandbox."),
-    ("BTCUSD data", "Real DAILY CLOSE only from CoinMetrics. No intraday highs/lows => SL/TP can only trigger on a daily close crossing the level. LOW fidelity; treat as illustrative."),
+    ("XAUUSD data", "Real HOURLY (H1) OHLC from FeziweMelvin/XAUUSD-Gold-Price (GitHub). Coverage ends 2025-06-06 (~$3,360). No 2026 gold is reachable from the sandbox allowlist; this is the most recent real year available."),
+    ("BTCUSD data", "Real DAILY CLOSE only from CoinMetrics, through 2026-05 (includes 2026). No intraday highs/lows => SL/TP can only trigger on a daily close crossing the level. LOW fidelity; treat as illustrative."),
+    ("Risk management", "Each trade is SIZED so the initial stop loses <= risk_per_trade (5%) of equity (the 'Risk $' column). Stop moves to breakeven at +1R, then trails. Trades that cannot be sized within the 5% cap at min lot are SKIPPED."),
     ("Costs modeled", "Spread + slippage + commission are ESTIMATES of Exness-style costs, not a live feed. Real fills, slippage and swaps will differ and are usually worse."),
-    ("Leverage note", "1:2000 leverage does not reduce risk - it enables ruin. The requested fixed lots (0.10 XAU / 0.06 BTC) on $500 are very large relative to capital; see Max Drawdown and the 'ruined' flag."),
+    ("Leverage note", "1:2000 leverage does not reduce risk - it enables ruin. Risk-based sizing (not fixed lots) is what keeps per-trade loss bounded; leverage just lets the margin fit."),
     ("Win rate trap", "A high win rate does NOT mean profitable. Read Net P/L, Profit Factor and Max Drawdown together, never win rate alone."),
     ("Before any real money", "Re-run on YOUR broker's data, then forward-test on a DEMO account for weeks. If demo != backtest, the cost model is wrong."),
 ]

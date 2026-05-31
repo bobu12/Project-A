@@ -17,6 +17,7 @@ from src.report import metrics, write_excel
 
 def main():
     start = config.ACCOUNT["start_balance"]
+    risk = config.ACCOUNT["risk_per_trade"]
     results = {}
 
     for sym, cfg in config.SYMBOLS.items():
@@ -27,7 +28,7 @@ def main():
         print(f"  bars: {len(df)}  period: {period}")
 
         trades, final_bal, params = walk_forward(
-            df, cfg, config.PARAM_GRID, config.WALK_FORWARD[sym], start)
+            df, cfg, config.PARAM_GRID, config.WALK_FORWARD[sym], start, risk)
 
         m = metrics(trades, start)
         print(f"  trades={m['trades']}  win%={m['win_rate_%']}  "
