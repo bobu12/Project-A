@@ -43,9 +43,29 @@ src/data.py        load CSVs -> clean OHLC frame
 src/strategy.py    z-score + ATR indicators and the entry signal
 src/backtester.py  no-look-ahead backtest + walk-forward re-optimizer
 src/report.py      metrics + Excel writer (Time/Buy-Sell/Entry/SL/Exit + summary)
-src/mt5_live.py    LIVE execution on Windows VPS (DEMO_ONLY=True by default)
-scripts/run_backtest.py   runs everything -> reports/backtest_report.xlsx
+src/mt5_live.py    LIVE execution primitives on Windows VPS (DEMO_ONLY=True)
+scripts/run_backtest.py        walk-forward backtest -> Excel
+scripts/compare_strategies.py  head-to-head edge test (meanrev vs breakout, sessions)
+scripts/optimize.py            overfit-vs-honest demo (in-sample vs unseen)
+scripts/win_rate_demo.py       proves high win% != profit
+scripts/competition_sim.py     Monte-Carlo P(18x) vs P(ruin) by risk level
+scripts/live_runner.py         shared live/dry-run engine (same signal code as backtest)
+scripts/run_xauusd.py          gold bot   (VALIDATED thin edge)  --live for demo
+scripts/run_btcusd.py          BTC bot    (EXPERIMENTAL/unvalidated) --live for demo
 ```
+
+## Automation (live bots)
+
+```bash
+python -m scripts.run_xauusd        # offline DRY RUN - prints what it would do
+python -m scripts.run_xauusd --live  # DEMO trading on a Windows VPS w/ MT5 + Exness
+```
+
+Both bots automate BREAKOUT + risk-based sizing (<=5%/trade), breakeven and
+trailing stops, using the SAME signal code the backtest used. `DEMO_ONLY=True`
+is the default safety. The expected edge is THIN (gold PF ~1.06); BTC is
+unvalidated. This is risk-controlled automation, **not** the +391% overfit
+figure - that one loses money out-of-sample.
 
 ## Run the backtest
 

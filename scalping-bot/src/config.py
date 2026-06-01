@@ -93,3 +93,39 @@ STRATEGY_VARIANTS = [
      "grid": {"channel": [20, 40], "atr_period": [14],
               "session": [_GOLD_SESSION], **_RISK}},
 ]
+
+# ---------------------------------------------------------------------------
+# LIVE automation config (per symbol) used by the runner on a Windows VPS.
+#
+# Both bots use BREAKOUT + the validated risk management. IMPORTANT honesty note
+# per symbol:
+#   XAUUSD - showed a genuine but THIN out-of-sample edge (PF ~1.06). Validated.
+#   BTCUSD - only had a tiny-sample (positive but NOT statistically meaningful)
+#            backtest, and only on daily data. Treat as UNVALIDATED / experimental.
+# Neither is the +391% overfit number (that one loses money out-of-sample).
+# Run on DEMO for weeks and compare fills to the backtest before any real money.
+# ---------------------------------------------------------------------------
+_LIVE_COMMON = {
+    "be_trigger_R": 1.0, "trail_R": 1.0, "max_hold": 48,
+    "risk_per_trade": ACCOUNT["risk_per_trade"],
+    "poll_seconds": 15, "history_bars": 300, "magic": 770001,
+}
+LIVE = {
+    "XAUUSD": {
+        "symbol": "XAUUSD", "timeframe": "H1", "strategy": "breakout",
+        "validated": True,
+        "params": {"channel": 20, "atr_period": 14, "session": None,
+                   "sl_atr": 1.5, "tp_atr": 3.0, "be_trigger_R": 1.0,
+                   "trail_R": 1.0, "max_hold": 48},
+        **_LIVE_COMMON,
+    },
+    "BTCUSD": {
+        "symbol": "BTCUSD", "timeframe": "M15", "strategy": "breakout",
+        "validated": False,   # tiny-sample backtest only - experimental
+        "params": {"channel": 20, "atr_period": 14, "session": None,
+                   "sl_atr": 1.5, "tp_atr": 4.0, "be_trigger_R": 1.0,
+                   "trail_R": 1.0, "max_hold": 48},
+        **_LIVE_COMMON,
+    },
+}
+
