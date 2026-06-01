@@ -64,3 +64,32 @@ WALK_FORWARD = {
     "XAUUSD": {"train": 24 * 30, "test": 24 * 20},   # ~30d train / ~20d test (H1: 24 bars/day)
     "BTCUSD": {"train": 120,     "test": 60},        # ~120d / ~60d (D1)
 }
+
+# Shared risk-management parameter ranges (used by every strategy variant).
+_RISK = {
+    "sl_atr":       [1.0, 1.5],
+    "tp_atr":       [3.0, 4.0],
+    "be_trigger_R": [1.0],
+    "trail_R":      [1.0, 1.5],
+    "max_hold":     [48],
+}
+
+# Liquid-hours window for gold (UTC): London open -> NY close-ish.
+_GOLD_SESSION = (7, 21)
+
+# Edge HYPOTHESES to test head-to-head. Each is a (strategy fn, param grid).
+# `session_only` variants are skipped for 24/7 / daily symbols.
+STRATEGY_VARIANTS = [
+    {"name": "meanrev",          "strategy": "meanrev",
+     "grid": {"lookback": [20, 40], "atr_period": [14], "entry_z": [1.5, 2.5],
+              "session": [None], **_RISK}},
+    {"name": "breakout",         "strategy": "breakout",
+     "grid": {"channel": [20, 40], "atr_period": [14],
+              "session": [None], **_RISK}},
+    {"name": "meanrev_session",  "strategy": "meanrev", "session_only": True,
+     "grid": {"lookback": [20, 40], "atr_period": [14], "entry_z": [1.5, 2.5],
+              "session": [_GOLD_SESSION], **_RISK}},
+    {"name": "breakout_session", "strategy": "breakout", "session_only": True,
+     "grid": {"channel": [20, 40], "atr_period": [14],
+              "session": [_GOLD_SESSION], **_RISK}},
+]

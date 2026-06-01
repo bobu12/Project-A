@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from itertools import product
 import numpy as np
 
-from .strategy import add_indicators, signal
+from .strategy import STRATEGIES
 
 
 @dataclass
@@ -43,7 +43,8 @@ class Trade:
 
 
 def _warmup(p):
-    return max(p["lookback"], p["atr_period"]) + 1
+    base = max(p.get("lookback", 0), p.get("channel", 0), p["atr_period"])
+    return base + 1
 
 
 def _size_lots(risk_money, r_distance, sym_cfg):
@@ -61,11 +62,12 @@ def _size_lots(risk_money, r_distance, sym_cfg):
     return round(lots, 4)
 
 
-def run_backtest(df, params, sym_cfg, start_balance, risk_per_trade, active_after=None):
-    d = add_indicators(df, params["lookback"], params["atr_period"]).reset_index(drop=True)
+def run_backtest(df, params, sym_cfg, start_balance, risk_per_trade,
+                 strategy="meanrev", active_after=None):
+    d = STRATEGIES[strategy](df, params).reset_index(drop=True)
     dates = d["Date"].to_numpy()
     o, h, low, c = (d[k].to_numpy(float) for k in ("open", "high", "low", "close"))
-    z, atr = d["z"].to_numpy(float), d["atr"].to_numpy(float)
+    sig_arr, atr = d["sig"].to_numpy(), d["atr"].to_numpy(float)
     n = len(d)
 
     contract = sym_cfg["contract_size"]
@@ -82,7 +84,7 @@ def run_backtest(df, params, sym_cfg, start_balance, risk_per_trade, active_afte
         if pos is None:
             if active_after is not None and dates[i] < active_after:
                 i += 1; continue
-            sig = signal(z[i], params["entry_z"])
+            sig = int(sig_arr[i])
             if sig and not np.isnan(atr[i]) and atr[i] > 0:
                 j = i + 1
                 ref = c[j] if close_only else o[j]
@@ -171,7 +173,8 @@ def _grid(g):
         yield dict(zip(keys, combo))
 
 
-def walk_forward(df, sym_cfg, grid_cfg, wf_cfg, start_balance, risk_per_trade):
+def walk_forward(df, sym_cfg, grid_cfg, wf_cfg, start_balance, risk_per_trade,
+                 strategy="meanrev"):
     train_n, test_n = wf_cfg["train"], wf_cfg["test"]
     combos = list(_grid(grid_cfg))
     balance = start_balance
@@ -182,7 +185,7 @@ def walk_forward(df, sym_cfg, grid_cfg, wf_cfg, start_balance, risk_per_trade):
         train = df.iloc[i - train_n:i]
         best_p, best_s = None, -1e18
         for p in combos:
-            t, _ = run_backtest(train, p, sym_cfg, 10_000.0, risk_per_trade)
+            t, _ = run_backtest(train, p, sym_cfg, 10_000.0, risk_per_trade, strategy)
             s = _score(t)
             if s > best_s:
                 best_s, best_p = s, p
@@ -191,7 +194,7 @@ def walk_forward(df, sym_cfg, grid_cfg, wf_cfg, start_balance, risk_per_trade):
         seg = df.iloc[max(0, i - warm):i + test_n]
         active_after = df.iloc[i]["Date"]
         t, balance = run_backtest(seg, best_p, sym_cfg, balance, risk_per_trade,
-                                  active_after=active_after)
+                                  strategy, active_after=active_after)
         oos_trades.extend(t)
         param_log.append({"from": active_after, **best_p, "is_score": round(best_s, 2)})
         i += test_n
