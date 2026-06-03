@@ -42,22 +42,47 @@ class GrowwProvider:
     def __init__(self):
         from growwapi import GrowwAPI
 
-        token = os.environ.get("GROWW_ACCESS_TOKEN")
-        if not token:
-            key = os.environ.get("GROWW_API_KEY")
-            secret = os.environ.get("GROWW_API_SECRET")
-            if not (key and secret):
-                raise RuntimeError(
-                    "Groww not configured: set GROWW_ACCESS_TOKEN, or "
-                    "GROWW_API_KEY + GROWW_API_SECRET."
-                )
-            token = GrowwAPI.get_access_token(api_key=key, secret=secret)
-        self.api = GrowwAPI(token)
+        self.api = GrowwAPI(self._resolve_token(GrowwAPI))
         self.delay = float(os.environ.get("GROWW_REQUEST_DELAY", "0.25"))
         # Constants are SDK attributes; fall back to plain strings if names differ.
         self.EX_NSE = getattr(self.api, "EXCHANGE_NSE", "NSE")
         self.EX_BSE = getattr(self.api, "EXCHANGE_BSE", "BSE")
         self.SEG_CASH = getattr(self.api, "SEGMENT_CASH", "CASH")
+
+    @staticmethod
+    def _resolve_token(GrowwAPI):
+        """Resolve a Groww access token from env vars. Three supported flows:
+
+          1) GROWW_ACCESS_TOKEN  — paste a token (resets daily at 6 AM IST).
+          2) GROWW_API_KEY + GROWW_TOTP_SECRET  — TOTP flow (RECOMMENDED for the
+             unattended automation: regenerates the token automatically through
+             the daily reset). GROWW_API_KEY is the "TOTP token" shown in Groww;
+             GROWW_TOTP_SECRET is the base32 secret behind the QR code.
+          3) GROWW_API_KEY + GROWW_API_SECRET  — static key+secret flow.
+        """
+        token = os.environ.get("GROWW_ACCESS_TOKEN")
+        if token:
+            return token
+
+        api_key = os.environ.get("GROWW_API_KEY")
+        totp_secret = os.environ.get("GROWW_TOTP_SECRET")
+        if api_key and totp_secret:
+            import pyotp
+            otp = pyotp.TOTP(totp_secret).now()
+            try:
+                return GrowwAPI.get_access_token(api_key=api_key, totp=otp)
+            except TypeError:  # SDK variant that names the OTP arg differently
+                return GrowwAPI.get_access_token(api_key=api_key, secret=otp)
+
+        secret = os.environ.get("GROWW_API_SECRET")
+        if api_key and secret:
+            return GrowwAPI.get_access_token(api_key=api_key, secret=secret)
+
+        raise RuntimeError(
+            "Groww not configured. Set one of: GROWW_ACCESS_TOKEN; or "
+            "GROWW_API_KEY + GROWW_TOTP_SECRET (TOTP); or "
+            "GROWW_API_KEY + GROWW_API_SECRET."
+        )
 
     def _exchange_symbol(self, ticker):
         if ticker.endswith(".BO"):

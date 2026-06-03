@@ -116,41 +116,46 @@ phone's browser — no app install needed.
 
 ## What it screens
 
-- **Technical:** RSI(14), SMA20 vs SMA50 trend (bullish/bearish), volume spike
-  (today vs 20-day average), 52-week high/low proximity.
-- **Price/volume:** price range, % change today, volume × average.
-- **Fundamentals:** P/E, market cap, sector (fetched for the top matches; max P/E
-  filter supported).
+Two buttons:
 
-Default behaviour with no filters: scans the universe and lists the biggest
-movers with all their signals. Tap **Filters** to narrow it down.
+- **Scan (RSI / volume / fundamentals):** RSI(14), SMA20 vs SMA50 trend, volume
+  spike, 52-week proximity, plus P/E, market cap and price/volume filters.
+- **EMA breakout scan (near 200 EMA):** the same EMA-confluence + breakout setup
+  as the automation (price near/under 200 EMA, 20/50/100 EMAs within ±6%, close
+  breaking the recent high on volume), run live via the configured data provider.
 
-## Run it
+## Host it on your laptop
 
 ```bash
 cd stock-scanner
 pip install -r requirements.txt
-python app.py
+cp .env.example .env          # optional: add Groww keys for live data on the EMA scan
+./host.sh                     # or: python app.py
 ```
 
-The server listens on `0.0.0.0:5000`.
+`host.sh` loads `.env` and prints both URLs:
 
-### Open from your phone
+- **On the laptop:** <http://localhost:5000>
+- **On your phone (same Wi-Fi):** `http://<your-laptop-LAN-IP>:5000` —
+  `host.sh` prints the exact address. On the phone, use **Share → Add to Home
+  Screen** for an app-like icon.
 
-- **Same Wi-Fi as the machine running it:** find the machine's LAN IP
-  (`ipconfig` / `ip addr`) and visit `http://<that-ip>:5000` on your phone.
-- **From anywhere:** deploy to a small host so you get a public URL —
-  [Render](https://render.com), [Railway](https://railway.app), or
-  [PythonAnywhere](https://www.pythonanywhere.com) all run this as-is
-  (start command: `python app.py`, or `gunicorn app:app` for production).
-  Then bookmark the URL / "Add to Home Screen" on your phone for an app-like icon.
+> Keep the laptop awake / plugged in while you want the app reachable. The RSI
+> scan works with no setup (yfinance); the **EMA breakout** button uses Groww if
+> you've added keys to `.env`, otherwise yfinance.
+
+**Want it reachable from anywhere (not just home Wi-Fi)?** Either run a tunnel
+(`cloudflared tunnel --url http://localhost:5000` or `ngrok http 5000`) for a
+temporary public URL, or deploy to [Render](https://render.com) /
+[Railway](https://railway.app) (start command `python app.py`).
 
 ## Data source & note on this repo's sandbox
 
 The automated scanner uses the **Groww API** for live NSE/BSE data (see *Data
 provider* above), falling back to **Yahoo Finance via
 [`yfinance`](https://github.com/ranaroussi/yfinance)** when Groww isn't
-configured. The mobile web app currently uses yfinance. Tickers use the `.NS`
+configured. The web app's **EMA breakout** button uses the same provider layer
+(Groww if configured); its RSI scan uses yfinance. Tickers use the `.NS`
 suffix for NSE and `.BO` for BSE (e.g. `RELIANCE.NS`).
 
 > The Claude Code web sandbox blocks outbound finance hosts (Groww, Yahoo, NSE),
@@ -163,9 +168,10 @@ suffix for NSE and `.BO` for BSE (e.g. `RELIANCE.NS`).
 
 | File | Purpose |
 |------|---------|
-| `app.py` | Flask backend: `/` (UI), `/api/scan`, `/api/universes`, `/api/health` |
-| `universe.py` | Nifty 50 / Nifty 100 ticker lists (edit to add your own) |
-| `static/index.html` | Mobile-first single-page UI |
+| `app.py` | Flask backend: `/` (UI), `/api/scan`, `/api/scan-ema`, `/api/health` |
+| `host.sh` | One-command laptop hosting (loads `.env`, prints phone URL) |
+| `static/index.html` | Mobile-first single-page UI (RSI scan + EMA breakout scan) |
+| `universe.py` | Ticker lists + CSV loader (edit to add your own) |
 | `requirements.txt` | Python dependencies |
 
 ## Customising

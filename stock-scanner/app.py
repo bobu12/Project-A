@@ -17,6 +17,9 @@ import pandas as pd
 import yfinance as yf
 from flask import Flask, jsonify, request, send_from_directory
 
+import providers
+import scanner_core as sc
+import universe as uni
 from universe import UNIVERSES
 
 app = Flask(__name__, static_folder="static")
@@ -226,6 +229,33 @@ def scan():
         "errors": errors,
         "results": matches,
     })
+
+
+@app.route("/api/scan-ema", methods=["POST"])
+def scan_ema():
+    """EMA-confluence breakout scan (price near/under 200 EMA, 20/50/100 EMAs
+    within +/- pct, optional breakout trigger), using the configured data
+    provider (Groww if creds present, else yfinance)."""
+    body = request.get_json(force=True, silent=True) or {}
+    uni_name = body.get("universe", "nifty50")
+    pct = float(body.get("confluencePct", 6.0))
+    require_breakout = bool(body.get("requireBreakout", True))
+
+    if uni_name in ("nifty50", "nifty100"):
+        tickers = uni.stock_and_etf_universe(uni_name)
+    else:
+        tickers = uni.equity_universe(uni_name) + uni.etf_universe()
+
+    cfg = sc.ScanConfig(
+        confluence_pct=pct, near200_pct=pct, require_breakout=require_breakout
+    )
+    try:
+        fetch, provider_name = providers.get_fetcher(body.get("provider"))
+        matches, stats = sc.scan(tickers, cfg, fetch_frames=fetch)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+    return jsonify({"provider": provider_name, "results": matches, **stats})
 
 
 @app.route("/api/universes")

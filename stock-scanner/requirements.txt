@@ -2,6 +2,8 @@ Flask>=3.0
 pandas>=2.0
 # Live NSE/BSE data via the official Groww API (preferred provider)
 growwapi>=0.1.0
+# TOTP code generation for the recommended Groww auth flow
+pyotp>=2.9
 # Free fallback data provider (delayed)
 yfinance>=0.2.40
 # Optional: only needed for the daily mutual-fund (NAV) check

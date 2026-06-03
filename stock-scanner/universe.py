@@ -69,6 +69,13 @@ def _read_csv_symbols(path):
     return out
 
 
+# Back-compat mapping used by the on-demand web app (app.py).
+UNIVERSES = {
+    "nifty50": NIFTY50,
+    "nifty100": NIFTY100,
+}
+
+
 def equity_universe(name="nifty500"):
     """Return the equity ticker list, preferring the downloaded CSV."""
     if name == "nifty50":

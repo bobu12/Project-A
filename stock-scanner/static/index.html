@@ -86,7 +86,8 @@
     </div>
   </details>
 
-  <button id="scanBtn" onclick="scan()">Scan</button>
+  <button id="scanBtn" onclick="scan()">Scan (RSI / volume / fundamentals)</button>
+  <button id="emaBtn" onclick="scanEMA()" style="background:#06d6a0">EMA breakout scan (near 200 EMA)</button>
 </div>
 
 <div id="status"></div>
@@ -121,6 +122,53 @@ async function scan(){
   }catch(e){
     status.textContent='Error: '+e.message;
   }finally{ btn.disabled=false; }
+}
+
+async function scanEMA(){
+  const btn=document.getElementById('emaBtn');
+  const status=document.getElementById('status');
+  const out=document.getElementById('results');
+  btn.disabled=true; out.innerHTML='';
+  status.innerHTML='<span class="spin"></span>Running EMA breakout scan… (live data, may take a bit)';
+  try{
+    const res=await fetch('/api/scan-ema',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({universe:document.getElementById('universe').value,confluencePct:6,requireBreakout:true})
+    });
+    const data=await res.json();
+    if(data.error){ status.textContent='Error: '+data.error; return; }
+    status.textContent=`${data.matched} breakout(s) of ${data.scanned} scanned · data: ${data.provider}`;
+    renderEMA(data.results);
+  }catch(e){ status.textContent='Error: '+e.message; }
+  finally{ btn.disabled=false; }
+}
+
+function renderEMA(list){
+  const out=document.getElementById('results');
+  if(!list || !list.length){ out.innerHTML='<div class="stock">No EMA-confluence breakouts right now.</div>'; return; }
+  out.innerHTML=list.map(s=>{
+    const up=(s.pctChange||0)>=0;
+    return `<div class="stock">
+      <div class="row">
+        <div><div class="sym">${s.symbol}</div><div class="name">near/under 200 EMA · max EMA dev ${s.maxDevPct}%</div></div>
+        <div style="text-align:right">
+          <div class="price">₹${s.price}</div>
+          <div class="${up?'up':'down'}" style="font-size:13px">${up?'▲':'▼'} ${s.pctChange}%</div>
+        </div>
+      </div>
+      <div class="metrics">
+        <span>200 EMA <b>${s.ema200}</b></span>
+        <span>Dist 200 <b>${s.distTo200Pct}%</b></span>
+        <span>Vol <b>${s.volRatio}×</b></span>
+        <span>20/50/100 <b>${s.ema20}/${s.ema50}/${s.ema100}</b></span>
+      </div>
+      <div class="chips">
+        ${s.breakout?'<span class="chip buy">Breakout</span>':''}
+        ${s.confluence?'<span class="chip buy">EMA confluence</span>':''}
+        ${s.nearUnder200?'<span class="chip">Near 200 EMA</span>':''}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function fmtCap(n){
