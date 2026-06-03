@@ -1,3 +1,5 @@
 Flask>=3.0
 yfinance>=0.2.40
 pandas>=2.0
+# Optional: only needed for the daily mutual-fund (NAV) check
+mftool>=2.0
