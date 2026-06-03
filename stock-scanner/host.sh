@@ -11,14 +11,20 @@ if [ -f .env ]; then
   set -a; . ./.env; set +a
 fi
 
+# Port: macOS reserves 5000 for AirPlay Receiver, so default to 8000 there.
+if [ -z "$PORT" ]; then
+  if [ "$(uname)" = "Darwin" ]; then PORT=8000; else PORT=5000; fi
+fi
+export PORT
+
 # Best-effort LAN IP for phone access.
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 [ -z "$IP" ] && IP="$(ipconfig getifaddr en0 2>/dev/null || true)"  # macOS
 
 echo "================================================================"
 echo " Stock scanner web app"
-echo "   This laptop : http://localhost:5000"
-[ -n "$IP" ] && echo "   Your phone  : http://$IP:5000   (same Wi-Fi network)"
+echo "   This laptop : http://localhost:$PORT"
+[ -n "$IP" ] && echo "   Your phone  : http://$IP:$PORT   (same Wi-Fi network)"
 echo "   Stop        : Ctrl-C"
 echo "================================================================"
 

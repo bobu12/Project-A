@@ -274,5 +274,11 @@ def health():
 
 
 if __name__ == "__main__":
+    import os
     # host=0.0.0.0 so a phone on the same network can reach it.
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    # PORT is configurable: macOS uses port 5000 for AirPlay Receiver, so set
+    # PORT=8000 (or disable AirPlay Receiver in System Settings > General > AirDrop & Handoff).
+    port = int(os.environ.get("PORT", "5000"))
+    host = os.environ.get("HOST", "0.0.0.0")
+    print(f" * Serving on http://localhost:{port}  (and http://<your-LAN-IP>:{port} for phones)")
+    app.run(host=host, port=port, debug=False)
