@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0b132b">
+<title>NSE Stock Scanner</title>
+<style>
+  :root{
+    --bg:#0b132b; --card:#1c2541; --accent:#5bc0be; --text:#e0e1dd;
+    --muted:#8d99ae; --green:#06d6a0; --red:#ef476f; --chip:#3a506b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--text);padding:env(safe-area-inset-top) 0 40px}
+  header{padding:18px 16px 10px;position:sticky;top:0;background:var(--bg);z-index:10}
+  h1{font-size:20px;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .panel{margin:0 16px;background:var(--card);border-radius:14px;padding:14px}
+  details summary{cursor:pointer;font-weight:600;color:var(--accent);list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:3px}
+  input,select{width:100%;padding:9px;border-radius:9px;border:1px solid var(--chip);
+    background:#0f1830;color:var(--text);font-size:15px}
+  .full{grid-column:1/3}
+  button{width:100%;margin:14px 0 0;padding:14px;font-size:16px;font-weight:700;
+    border:none;border-radius:12px;background:var(--accent);color:#06182a}
+  button:active{opacity:.8}
+  button:disabled{opacity:.5}
+  #status{margin:14px 16px 0;color:var(--muted);font-size:13px;min-height:18px}
+  .results{margin:10px 16px}
+  .stock{background:var(--card);border-radius:14px;padding:13px;margin-bottom:10px}
+  .row{display:flex;justify-content:space-between;align-items:baseline}
+  .sym{font-size:17px;font-weight:700}
+  .name{color:var(--muted);font-size:12px;margin-top:1px}
+  .price{font-size:17px;font-weight:700}
+  .up{color:var(--green)} .down{color:var(--red)}
+  .metrics{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:9px;font-size:12px;color:var(--muted)}
+  .metrics b{color:var(--text);font-weight:600}
+  .chips{margin-top:9px;display:flex;flex-wrap:wrap;gap:6px}
+  .chip{background:var(--chip);border-radius:20px;padding:3px 10px;font-size:11px}
+  .chip.buy{background:#0c5b48;color:#7dffd6}
+  .chip.sell{background:#5b1226;color:#ff9cb5}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid var(--muted);
+    border-top-color:var(--accent);border-radius:50%;animation:s .8s linear infinite;vertical-align:-3px;margin-right:6px}
+  @keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>📈 NSE Stock Scanner</h1>
+  <div class="sub">Technical · price/volume · fundamentals</div>
+</header>
+
+<div class="panel">
+  <div class="grid">
+    <div class="full">
+      <label>Universe</label>
+      <select id="universe">
+        <option value="nifty50">Nifty 50 (fast)</option>
+        <option value="nifty100">Nifty 100 (slower)</option>
+      </select>
+    </div>
+  </div>
+
+  <details style="margin-top:12px">
+    <summary>Filters (tap to adjust)</summary>
+    <div class="grid">
+      <div><label>Min price ₹</label><input id="minPrice" type="number" inputmode="decimal" placeholder="any"></div>
+      <div><label>Max price ₹</label><input id="maxPrice" type="number" inputmode="decimal" placeholder="any"></div>
+      <div><label>Min % change</label><input id="minPct" type="number" inputmode="decimal" placeholder="any"></div>
+      <div><label>Max % change</label><input id="maxPct" type="number" inputmode="decimal" placeholder="any"></div>
+      <div><label>RSI min</label><input id="rsiMin" type="number" inputmode="decimal" placeholder="any"></div>
+      <div><label>RSI max</label><input id="rsiMax" type="number" inputmode="decimal" placeholder="any"></div>
+      <div><label>Min vol × avg</label><input id="volRatioMin" type="number" inputmode="decimal" placeholder="e.g. 1.5"></div>
+      <div><label>Max P/E</label><input id="maxPe" type="number" inputmode="decimal" placeholder="any"></div>
+      <div class="full">
+        <label>Trend</label>
+        <select id="trend">
+          <option value="">Any</option>
+          <option value="bullish">Bullish only</option>
+          <option value="bearish">Bearish only</option>
+        </select>
+      </div>
+    </div>
+  </details>
+
+  <button id="scanBtn" onclick="scan()">Scan</button>
+</div>
+
+<div id="status"></div>
+<div class="results" id="results"></div>
+
+<script>
+function numVal(id){ const v=document.getElementById(id).value; return v===''?null:parseFloat(v); }
+
+async function scan(){
+  const btn=document.getElementById('scanBtn');
+  const status=document.getElementById('status');
+  const out=document.getElementById('results');
+  btn.disabled=true; out.innerHTML='';
+  status.innerHTML='<span class="spin"></span>Scanning… (first run downloads price data, ~10-30s)';
+
+  const filters={
+    minPrice:numVal('minPrice'), maxPrice:numVal('maxPrice'),
+    minPct:numVal('minPct'), maxPct:numVal('maxPct'),
+    rsiMin:numVal('rsiMin'), rsiMax:numVal('rsiMax'),
+    volRatioMin:numVal('volRatioMin'), maxPe:numVal('maxPe'),
+    trend:document.getElementById('trend').value || null,
+  };
+
+  try{
+    const res=await fetch('/api/scan',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({universe:document.getElementById('universe').value,filters,fundamentals:true})
+    });
+    const data=await res.json();
+    status.textContent=`${data.count} match(es) of ${data.scanned} scanned`;
+    render(data.results);
+  }catch(e){
+    status.textContent='Error: '+e.message;
+  }finally{ btn.disabled=false; }
+}
+
+function fmtCap(n){
+  if(!n) return '—';
+  if(n>=1e12) return '₹'+(n/1e12).toFixed(2)+'L Cr';
+  if(n>=1e7) return '₹'+(n/1e7).toFixed(0)+' Cr';
+  return '₹'+n;
+}
+
+function render(list){
+  const out=document.getElementById('results');
+  if(!list.length){ out.innerHTML='<div class="stock">No stocks matched your filters.</div>'; return; }
+  out.innerHTML=list.map(s=>{
+    const up=(s.pctChange||0)>=0;
+    const chips=(s.signals||[]).map(sig=>{
+      let cls='';
+      if(/Oversold|Bullish|52w low/.test(sig)) cls='buy';
+      if(/Overbought|Bearish|52w high/.test(sig)) cls='sell';
+      return `<span class="chip ${cls}">${sig}</span>`;
+    }).join('');
+    return `<div class="stock">
+      <div class="row">
+        <div><div class="sym">${s.symbol}</div><div class="name">${s.name||s.sector||''}</div></div>
+        <div style="text-align:right">
+          <div class="price">₹${s.price??'—'}</div>
+          <div class="${up?'up':'down'}" style="font-size:13px">${up?'▲':'▼'} ${s.pctChange??'—'}%</div>
+        </div>
+      </div>
+      <div class="metrics">
+        <span>RSI <b>${s.rsi??'—'}</b></span>
+        <span>Vol <b>${s.volRatio??'—'}×</b></span>
+        <span>P/E <b>${s.pe??'—'}</b></span>
+        <span>MCap <b>${fmtCap(s.marketCap)}</b></span>
+        <span>SMA20 <b>${s.sma20??'—'}</b></span>
+        <span>SMA50 <b>${s.sma50??'—'}</b></span>
+      </div>
+      ${chips?`<div class="chips">${chips}</div>`:''}
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
