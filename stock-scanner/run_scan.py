@@ -16,6 +16,7 @@ import csv
 import datetime as dt
 import os
 
+import providers
 import scanner_core as sc
 import universe
 from notify import render_html, send_email
@@ -52,6 +53,7 @@ def main():
     ap.add_argument("--mf", action="store_true", help="also run daily mutual-fund check")
     ap.add_argument("--confluence-only", action="store_true", help="drop breakout trigger")
     ap.add_argument("--equity", default="nifty500", help="equity universe (nifty50/nifty100/nifty500)")
+    ap.add_argument("--provider", default=None, help="data provider (groww/yfinance); auto if omitted")
     ap.add_argument("--confluence-pct", type=float, default=6.0)
     args = ap.parse_args()
 
@@ -62,8 +64,9 @@ def main():
     )
 
     tickers = universe.stock_and_etf_universe(args.equity)
-    print(f"Scanning {len(tickers)} stocks/ETFs ...")
-    matches, stats = sc.scan(tickers, cfg)
+    fetch, provider_name = providers.get_fetcher(args.provider)
+    print(f"Scanning {len(tickers)} stocks/ETFs via {provider_name} ...")
+    matches, stats = sc.scan(tickers, cfg, fetch_frames=fetch)
     print(f"  matched {stats['matched']} / scanned {stats['scanned']} (errors {stats['errors']})")
     save_csv(matches, "breakouts")
 

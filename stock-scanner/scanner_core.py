@@ -119,12 +119,22 @@ def ticker_frame(data, ticker):
     return df if df is not None and not df.empty else None
 
 
-def scan(tickers, cfg: ScanConfig = ScanConfig(), period="2y"):
-    """Scan a list of tickers; return (matches, stats)."""
-    data = fetch_prices(tickers, period=period)
+def scan(tickers, cfg: ScanConfig = ScanConfig(), fetch_frames=None, period="2y"):
+    """Scan a list of tickers; return (matches, stats).
+
+    fetch_frames: optional callable(tickers) -> {ticker: OHLCV DataFrame}. When
+    omitted, falls back to a yfinance bulk download. Use providers.get_fetcher()
+    to obtain a Groww or yfinance fetcher.
+    """
+    if fetch_frames is None:
+        data = fetch_prices(tickers, period=period)
+        frames = {t: ticker_frame(data, t) for t in tickers}
+    else:
+        frames = fetch_frames(tickers)
+
     matches, errors = [], 0
     for t in tickers:
-        df = ticker_frame(data, t)
+        df = frames.get(t)
         if df is None:
             errors += 1
             continue
