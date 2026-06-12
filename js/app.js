@@ -59,7 +59,7 @@
 
   var state = {
     exchangeId: EXCHANGES[0].id,
-    providerId: localStorage.getItem(LS_PROVIDER) || "mock",
+    providerId: localStorage.getItem(LS_PROVIDER) || "yahoo",
     rows: [],
     sortKey: "marketCap",
     sortDir: -1, // -1 desc, 1 asc
