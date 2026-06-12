@@ -69,9 +69,9 @@
         </label>
         <p class="field-note" id="provider-note"></p>
         <div class="provider-info">
-          <p><strong>Free:</strong> Sample data (offline) · Yahoo Finance (no key — best for Saudi/Qatar/Kuwait; UAE/Oman/Bahrain partial).</p>
-          <p><strong>Cheapest paid:</strong> EODHD (~$20/mo, widest coverage) · Twelve Data Grow ($29/mo, best real-time for Saudi/Abu&nbsp;Dhabi/Qatar).</p>
-          <p class="muted">Keys are stored only in this browser (localStorage). Live calls may be blocked by browser CORS depending on the provider.</p>
+          <p><strong>Phase 1 (free):</strong> Sample data (offline) · Yahoo Finance (no key — best for Saudi/Qatar/Kuwait; UAE/Oman/Bahrain partial).</p>
+          <p><strong>Phase 2 (live):</strong> Twelve Data — Grow plan ($29/mo) for Saudi/Abu&nbsp;Dhabi/Qatar · EODHD (~$20/mo, widest coverage).</p>
+          <p class="muted">Keys are stored only in this browser (localStorage), never in the repo. Live calls may be blocked by browser CORS depending on the provider.</p>
         </div>
       </div>
       <div class="modal-foot">
@@ -86,7 +86,12 @@
   </footer>
 
   <script src="js/data.js"></script>
-  <script src="js/providers.js"></script>
+  <!-- Provider modules (kept as separate files): framework first, then each provider self-registers -->
+  <script src="js/providers/base.js"></script>
+  <script src="js/providers/mock.js"></script>
+  <script src="js/providers/yahoo.js"></script>
+  <script src="js/providers/twelvedata.js"></script>
+  <script src="js/providers/eodhd.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

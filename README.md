@@ -33,12 +33,28 @@ python3 -m http.server 8000
 
 Tab between exchanges, search by name/code, and click any column header to sort.
 
-## Data sources (free by default, paid optional)
+## Data sources — phased & modular
 
 The app runs on **sample data** out of the box so it works offline with no
 account. Open **⚙ Data source** to switch providers — the choice and any API key
-are saved in your browser's `localStorage`. All providers share one interface
-(`js/providers.js`), so adding/swapping a feed is a one-file change.
+are saved in your browser's `localStorage` (never committed to the repo).
+
+Providers are kept as **separate modules** under `js/providers/`, each
+self-registering with a shared framework, so adding/swapping a feed is a
+self-contained file change:
+
+```
+js/providers/base.js        Framework: contract, registry, fallback, helpers
+js/providers/mock.js        Phase 1 · sample data (default, offline)
+js/providers/yahoo.js       Phase 1 · Yahoo Finance (free, no key)
+js/providers/twelvedata.js  Phase 2 · Twelve Data live feed (API key)
+js/providers/eodhd.js       Phase 2 · EODHD alternative (API key)
+```
+
+- **Phase 1** — free defaults (sample data + Yahoo Finance), no account needed.
+- **Phase 2** — live paid feed via **Twelve Data** (Grow plan for GCC equities),
+  with EODHD as a cheaper-coverage alternative. Select it under ⚙ Data source
+  and paste your key; nothing is stored server-side or in git.
 
 | Provider | Cost | GCC coverage | Notes |
 |---|---|---|---|

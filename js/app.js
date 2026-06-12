@@ -242,13 +242,7 @@
     var p = providerById(els.providerSelect.value);
     els.apikeyField.style.display = p.needsKey ? "" : "none";
     els.apikeyInput.value = localStorage.getItem(LS_KEY_PREFIX + p.id) || "";
-    var notes = {
-      mock: "Built-in sample data. No network, no key — always works.",
-      yahoo: "Free, no key. Best coverage for Saudi/Qatar/Kuwait; may be blocked by browser CORS.",
-      twelvedata: "Requires a Twelve Data key. GCC equities need the Grow plan ($29/mo) or higher.",
-      eodhd: "Requires an EODHD key. Cheapest broad coverage (~$20/mo); confirm exchange suffixes in your account."
-    };
-    els.providerNote.textContent = notes[p.id] || "";
+    els.providerNote.textContent = p.note || "";
   }
 
   function closeSettings() { els.modal.hidden = true; }
