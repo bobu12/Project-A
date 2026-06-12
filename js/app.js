@@ -195,7 +195,9 @@
   }
 
   function currentKey() {
-    return localStorage.getItem(LS_KEY_PREFIX + state.providerId) || "";
+    var stored = localStorage.getItem(LS_KEY_PREFIX + state.providerId);
+    if (stored) return stored;
+    return providerById(state.providerId).defaultKey || "";
   }
 
   function loadQuotes() {
@@ -241,7 +243,7 @@
   function syncModalForProvider() {
     var p = providerById(els.providerSelect.value);
     els.apikeyField.style.display = p.needsKey ? "" : "none";
-    els.apikeyInput.value = localStorage.getItem(LS_KEY_PREFIX + p.id) || "";
+    els.apikeyInput.value = localStorage.getItem(LS_KEY_PREFIX + p.id) || p.defaultKey || "";
     els.providerNote.textContent = p.note || "";
   }
 

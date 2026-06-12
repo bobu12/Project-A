@@ -26,7 +26,11 @@
     label: "Twelve Data — live (Phase 2)",
     needsKey: true,
     phase: 2,
-    note: "Phase-2 live feed. Needs a Twelve Data key; GCC equities require the Grow plan ($29/mo)+.",
+    // Prefilled demo key (free tier). Used when no key is saved in localStorage.
+    // GCC equities still require the Grow plan ($29/mo)+ — the demo key returns
+    // US/FX/crypto only. Replace via the Settings dialog with your own key.
+    defaultKey: "0d20071312944c31ac2a32ebc81c2cb1",
+    note: "Phase-2 live feed. Demo key prefilled; GCC equities require the Grow plan ($29/mo)+.",
     getQuotes: function (exchange, apiKey) {
       if (!apiKey) return P.get("mock").getQuotes(exchange);
       var symbols = exchange.stocks.map(function (s) { return s.code; }).join(",");
