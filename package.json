@@ -6,7 +6,8 @@
   "scripts": {
     "start": "python3 serve.py",
     "serve": "python3 serve.py",
-    "test": "node tests/run.js"
+    "test": "node tests/run.js",
+    "build": "node scripts/build-standalone.js"
   },
   "license": "MIT"
 }
