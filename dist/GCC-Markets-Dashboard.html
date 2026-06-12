@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GCC Markets · Stock Dashboard</title>
+  <meta name="description" content="Live-style dashboard listing stocks across the GCC exchanges: Tadawul, DFM, ADX, QSE, Boursa Kuwait, MSX and Bahrain Bourse." />
+  <style>
+:root {
+  --bg: #0b0f16;
+  --panel: #141a24;
+  --panel-2: #1b2330;
+  --border: #28323f;
+  --text: #e6edf3;
+  --muted: #93a1b1;
+  --accent: #4f8cff;
+  --accent-2: #2f6bdc;
+  --up: #2ea043;
+  --down: #f05151;
+  --warn: #d29922;
+  --radius: 12px;
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: radial-gradient(1200px 500px at 85% -10%, #15243d 0%, var(--bg) 55%);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.45;
+  min-height: 100vh;
+}
+
+/* Header */
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px clamp(14px, 3vw, 36px);
+  border-bottom: 1px solid var(--border);
+  background: rgba(11, 15, 22, 0.75);
+  backdrop-filter: blur(6px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.brand { display: flex; align-items: center; gap: 13px; }
+.brand-mark {
+  display: grid; place-items: center;
+  width: 42px; height: 42px; border-radius: 11px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  font-size: 20px; box-shadow: var(--shadow);
+}
+.brand h1 { font-size: 1.1rem; margin: 0; }
+.tagline { margin: 0; color: var(--muted); font-size: 0.74rem; }
+
+.header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.source-badge {
+  font-size: 0.74rem; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 5px 12px; background: var(--panel-2);
+}
+.source-badge.is-live { color: var(--up); border-color: var(--up); }
+
+/* Buttons */
+.btn {
+  border: 1px solid transparent; border-radius: 9px;
+  padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer;
+  transition: background .15s, border-color .15s, opacity .15s; white-space: nowrap;
+}
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-secondary { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+.btn-secondary:hover { border-color: var(--accent); }
+.btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.icon-btn { background: none; border: none; color: var(--muted); font-size: 1rem; cursor: pointer; }
+.icon-btn:hover { color: var(--text); }
+
+/* Exchange tabs */
+.exchange-tabs {
+  display: flex; gap: 8px; overflow-x: auto;
+  padding: 12px clamp(14px, 3vw, 36px);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 74px; z-index: 15;
+  background: rgba(11, 15, 22, 0.7); backdrop-filter: blur(6px);
+}
+.tab {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 14px; cursor: pointer;
+  color: var(--muted); font: inherit; white-space: nowrap;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.tab:hover { color: var(--text); border-color: var(--accent); }
+.tab.is-active { color: var(--text); border-color: var(--accent); background: #11203a; }
+.tab-flag { font-size: 1.05rem; }
+.tab-name { font-weight: 600; font-size: 0.86rem; }
+.tab-ccy { font-size: 0.68rem; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; }
+.tab.is-active .tab-ccy { color: var(--accent); border-color: var(--accent); }
+
+/* Layout */
+.layout { padding: clamp(14px, 3vw, 36px); max-width: 1500px; margin: 0 auto; }
+
+.market-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.market-head h2 { margin: 0; font-size: 1.15rem; }
+.market-sub { margin: 2px 0 0; color: var(--muted); font-size: 0.82rem; }
+.market-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.search {
+  background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  border-radius: 9px; padding: 9px 14px; font: inherit; min-width: 220px;
+}
+.search:focus { outline: none; border-color: var(--accent); }
+.updated { color: var(--muted); font-size: 0.76rem; }
+
+/* Table */
+.table-wrap {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  overflow-x: auto; background: var(--panel); box-shadow: var(--shadow);
+}
+.stock-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; min-width: 1100px; }
+.stock-table thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--panel-2); color: var(--muted);
+  text-align: right; font-weight: 600; font-size: 0.72rem;
+  letter-spacing: .4px; text-transform: uppercase;
+  padding: 11px 12px; white-space: nowrap; cursor: pointer;
+  border-bottom: 1px solid var(--border); user-select: none;
+}
+.stock-table thead th:hover { color: var(--text); }
+.stock-table th.is-sorted { color: var(--accent); }
+.sort-caret { font-size: 0.6rem; }
+.th-text { text-align: left; }
+
+.stock-table tbody td {
+  text-align: right; padding: 10px 12px; white-space: nowrap;
+  border-bottom: 1px solid rgba(40, 50, 63, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+.stock-table tbody tr:hover { background: rgba(79, 140, 255, 0.06); }
+.td-text { text-align: left; }
+.td-code { font-weight: 700; color: var(--text); }
+.td-name { text-align: left; color: var(--text); max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.up { color: var(--up); }
+.down { color: var(--down); }
+.flat { color: var(--muted); }
+
+.table-empty { padding: 26px; text-align: center; color: var(--muted); margin: 0; }
+
+.disclaimer { color: var(--muted); font-size: 0.78rem; margin: 16px 2px 0; }
+.disclaimer strong { color: var(--text); }
+
+/* Footer */
+.site-footer {
+  border-top: 1px solid var(--border); margin-top: 28px;
+  padding: 20px clamp(14px, 3vw, 36px); text-align: center;
+  color: var(--muted); font-size: 0.78rem;
+}
+
+/* Modal */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+  display: grid; place-items: center; z-index: 50; padding: 18px;
+}
+.modal {
+  width: min(480px, 100%); background: var(--panel);
+  border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow);
+}
+.modal-head, .modal-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 18px;
+}
+.modal-head { border-bottom: 1px solid var(--border); }
+.modal-head h3 { margin: 0; font-size: 1rem; }
+.modal-foot { border-top: 1px solid var(--border); gap: 10px; justify-content: flex-end; }
+.modal-body { padding: 18px; display: grid; gap: 14px; }
+.field { display: grid; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+.field select, .field input {
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 9px; padding: 9px 12px; font: inherit;
+}
+.field select:focus, .field input:focus { outline: none; border-color: var(--accent); }
+.field-note { margin: 0; font-size: 0.78rem; color: var(--warn); }
+.provider-info { font-size: 0.76rem; color: var(--muted); display: grid; gap: 6px;
+  border-top: 1px dashed var(--border); padding-top: 12px; }
+.provider-info strong { color: var(--text); }
+.provider-info .muted { opacity: .85; }
+
+@media (max-width: 640px) {
+  .market-head { align-items: flex-start; }
+  .search { min-width: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+</style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">📈</span>
+      <div>
+        <h1>GCC Markets Dashboard</h1>
+        <p class="tagline">Tadawul · DFM · ADX · QSE · Boursa Kuwait · MSX · Bahrain Bourse</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="source-badge" id="source-badge" title="Active data source">Sample data</span>
+      <button type="button" id="refresh-btn" class="btn btn-secondary" title="Reload quotes">↻ Refresh</button>
+      <button type="button" id="settings-btn" class="btn btn-ghost" aria-haspopup="dialog">⚙ Data source</button>
+    </div>
+  </header>
+
+  <nav class="exchange-tabs" id="exchange-tabs" aria-label="Exchanges"></nav>
+
+  <main class="layout">
+    <section class="market-head">
+      <div>
+        <h2 id="market-title">—</h2>
+        <p class="market-sub" id="market-sub">—</p>
+      </div>
+      <div class="market-tools">
+        <input type="search" id="search-input" class="search" placeholder="Search name or code…" aria-label="Search stocks" />
+        <span class="updated" id="updated-at">—</span>
+      </div>
+    </section>
+
+    <div class="table-wrap" role="region" aria-label="Stock table" tabindex="0">
+      <table class="stock-table" id="stock-table">
+        <thead id="stock-thead"></thead>
+        <tbody id="stock-tbody"></tbody>
+      </table>
+      <p class="table-empty" id="table-empty" hidden>No stocks match your search.</p>
+    </div>
+
+    <p class="disclaimer">
+      Figures are <strong>illustrative sample data</strong> by default so the app runs with no account.
+      Switch to a live feed under <em>⚙ Data source</em>. Not investment advice.
+    </p>
+  </main>
+
+  <!-- Settings dialog -->
+  <div class="modal-backdrop" id="settings-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-head">
+        <h3 id="settings-title">Data source</h3>
+        <button type="button" id="settings-close" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="field">
+          <span>Provider</span>
+          <select id="provider-select"></select>
+        </label>
+        <label class="field" id="apikey-field">
+          <span>API key</span>
+          <input type="password" id="apikey-input" placeholder="Paste your API key" autocomplete="off" />
+        </label>
+        <p class="field-note" id="provider-note"></p>
+        <div class="provider-info">
+          <p><strong>Phase 1 (free):</strong> Sample data (offline) · Yahoo Finance (no key — best for Saudi/Qatar/Kuwait; UAE/Oman/Bahrain partial).</p>
+          <p><strong>Phase 2 (live):</strong> Twelve Data — Grow plan ($29/mo) for Saudi/Abu&nbsp;Dhabi/Qatar · EODHD (~$20/mo, widest coverage).</p>
+          <p class="muted">Keys are stored only in this browser (localStorage), never in the repo. Live calls may be blocked by browser CORS depending on the provider.</p>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" id="settings-cancel" class="btn btn-ghost">Cancel</button>
+        <button type="button" id="settings-save" class="btn btn-primary">Save &amp; reload</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <p>Project-A · GCC Markets Dashboard — companion to the AWS architecture in this repository.</p>
+  </footer>
+<script>
+/* ===== js/data.js ===== */
+/*
+ * Sample / reference dataset for the GCC Stock Market Dashboard.
+ *
+ * Ticker codes and company names are real; prices, volumes and market caps are
+ * illustrative so the app runs fully offline with no API key. This is the
+ * default ("mock") data source. Swap in a live provider via the Settings panel
+ * (see js/providers.js) without touching this file.
+ *
+ * Each stock is built with S(...) which derives the display fields the UI needs
+ * from a small set of consistent inputs, so values stay internally coherent
+ * (low <= open/cmp/prevClose <= high).
+ */
+(function (global) {
+  "use strict";
+
+  /**
+   * Build a normalized stock record.
+   * @param {string} code        Exchange ticker / symbol
+   * @param {string} name        Company name
+   * @param {number} cmp         Current market price (last traded)
+   * @param {number} prevClose   Previous session close
+   * @param {number} open        Today's opening price
+   * @param {number} low         Session low
+   * @param {number} high        Session high
+   * @param {number} weekOpen    This week's opening price
+   * @param {number} volume      Volume traded today (shares)
+   * @param {number} marketCap   Market capitalization (local currency)
+   */
+  function S(code, name, cmp, prevClose, open, low, high, weekOpen, volume, marketCap) {
+    var change = cmp - prevClose;
+    return {
+      code: code,
+      name: name,
+      cmp: cmp,
+      change: change,
+      changePct: prevClose ? (change / prevClose) * 100 : 0,
+      opening: open,        // "Opening"
+      closing: prevClose,   // "Closing" (previous session close)
+      dayOpen: open,        // Daily open
+      dayClose: cmp,        // Daily close (last traded)
+      weekOpen: weekOpen,   // Weekly open
+      weekClose: cmp,       // Weekly close (latest)
+      sessionHigh: high,    // Session high
+      sessionLow: low,      // Session low
+      volume: volume,       // Volume traded for the day
+      marketCap: marketCap
+    };
+  }
+
+  var EXCHANGES = [
+    {
+      id: "tadawul", name: "Saudi Exchange (Tadawul)", short: "Tadawul",
+      country: "Saudi Arabia", flag: "🇸🇦", currency: "SAR", mic: "XSAU",
+      yahooSuffix: ".SR",
+      stocks: [
+        S("2222", "Saudi Aramco",            28.40, 28.25, 28.30, 28.05, 28.70, 28.10, 18_540_000, 6_870_000_000_000),
+        S("1120", "Al Rajhi Bank",           92.50, 91.80, 91.90, 91.40, 93.20, 90.60,  4_120_000,  370_000_000_000),
+        S("2010", "SABIC",                   72.30, 72.90, 72.80, 71.90, 73.10, 73.50,  2_980_000,  216_000_000_000),
+        S("7010", "Saudi Telecom (stc)",     41.20, 40.85, 40.90, 40.70, 41.55, 40.40,  3_410_000,  205_000_000_000),
+        S("1180", "Saudi National Bank",     35.80, 35.55, 35.60, 35.30, 36.05, 35.10,  5_660_000,  214_000_000_000),
+        S("1010", "Riyad Bank",              28.95, 29.10, 29.05, 28.70, 29.20, 29.30,  1_870_000,   86_000_000_000),
+        S("2350", "Saudi Kayan",             11.40, 11.20, 11.25, 11.10, 11.60, 11.00,  6_240_000,   17_100_000_000),
+        S("4002", "Mouwasat Medical",        95.00, 94.20, 94.40, 93.80, 96.10, 92.50,    410_000,   19_000_000_000)
+      ]
+    },
+    {
+      id: "dfm", name: "Dubai Financial Market (DFM)", short: "DFM",
+      country: "United Arab Emirates", flag: "🇦🇪", currency: "AED", mic: "XDFM",
+      yahooSuffix: ".DU",
+      stocks: [
+        S("EMAAR",       "Emaar Properties",        8.45,  8.38,  8.40,  8.30,  8.52,  8.20, 12_300_000,  74_500_000_000),
+        S("DIB",         "Dubai Islamic Bank",      6.20,  6.15,  6.16,  6.10,  6.27,  6.05,  9_870_000,  44_800_000_000),
+        S("EMIRATESNBD", "Emirates NBD",           19.80, 19.65, 19.70, 19.50, 20.05, 19.40,  3_210_000, 125_000_000_000),
+        S("DEWA",        "Dubai Electricity & Water", 2.55, 2.53, 2.54, 2.50, 2.58, 2.49, 21_400_000, 127_500_000_000),
+        S("SALIK",       "Salik Company",           4.30,  4.26,  4.27,  4.22,  4.35,  4.18,  7_640_000,  32_250_000_000),
+        S("TECOM",       "TECOM Group",             3.85,  3.81,  3.82,  3.77,  3.90,  3.74,  2_540_000,  19_250_000_000),
+        S("DFM",         "Dubai Financial Market",  1.62,  1.60,  1.61,  1.58,  1.66,  1.57,  5_980_000,  12_960_000_000),
+        S("AMANAT",      "Amanat Holdings",         1.45,  1.47,  1.46,  1.43,  1.49,  1.50,  1_870_000,   3_625_000_000)
+      ]
+    },
+    {
+      id: "adx", name: "Abu Dhabi Securities Exchange (ADX)", short: "ADX",
+      country: "United Arab Emirates", flag: "🇦🇪", currency: "AED", mic: "XADS",
+      yahooSuffix: ".AD",
+      stocks: [
+        S("FAB",        "First Abu Dhabi Bank",     13.20, 13.10, 13.12, 13.00, 13.34, 12.95, 6_540_000, 145_000_000_000),
+        S("ADCB",       "Abu Dhabi Commercial Bank", 9.85,  9.78,  9.80,  9.70,  9.94,  9.65, 4_120_000,  71_000_000_000),
+        S("ALDAR",      "Aldar Properties",          7.10,  7.02,  7.04,  6.96,  7.20,  6.90, 8_760_000,  55_800_000_000),
+        S("IHC",        "International Holding Co.", 400.0, 398.5, 399.0, 396.0, 404.0, 395.0,   210_000, 740_000_000_000),
+        S("ADNOCGAS",   "ADNOC Gas",                 3.45,  3.42,  3.43,  3.39,  3.49,  3.37,11_900_000, 265_000_000_000),
+        S("ADNOCDIST",  "ADNOC Distribution",        3.78,  3.80,  3.79,  3.74,  3.84,  3.82, 3_980_000,  47_250_000_000),
+        S("ADIB",       "Abu Dhabi Islamic Bank",   14.60, 14.48, 14.50, 14.35, 14.78, 14.20, 1_760_000,  53_000_000_000),
+        S("TAQA",       "Abu Dhabi National Energy", 3.10,  3.08,  3.09,  3.05,  3.14,  3.06, 2_410_000, 348_000_000_000)
+      ]
+    },
+    {
+      id: "qse", name: "Qatar Stock Exchange (QSE)", short: "QSE",
+      country: "Qatar", flag: "🇶🇦", currency: "QAR", mic: "DSMD",
+      yahooSuffix: ".QA",
+      stocks: [
+        S("QNBK", "Qatar National Bank",        16.80, 16.70, 16.72, 16.55, 16.95, 16.60, 5_340_000, 155_000_000_000),
+        S("IQCD", "Industries Qatar",           13.10, 13.00, 13.02, 12.90, 13.25, 12.85, 2_870_000,  79_200_000_000),
+        S("QIBK", "Qatar Islamic Bank",         22.40, 22.20, 22.25, 22.05, 22.60, 21.95, 1_980_000,  52_900_000_000),
+        S("MARK", "Masraf Al Rayan",             2.55,  2.57,  2.56,  2.52,  2.60,  2.59, 6_640_000,  23_700_000_000),
+        S("QEWS", "Qatar Electricity & Water",  17.20, 17.05, 17.08, 16.90, 17.40, 16.80,   540_000,  18_900_000_000),
+        S("ORDS", "Ooredoo",                    11.30, 11.22, 11.24, 11.10, 11.45, 11.05, 1_240_000,  36_200_000_000),
+        S("CBQK", "Commercial Bank of Qatar",    4.65,  4.61,  4.62,  4.57,  4.71,  4.55, 2_310_000,  18_800_000_000)
+      ]
+    },
+    {
+      id: "kuwait", name: "Boursa Kuwait", short: "Boursa Kuwait",
+      country: "Kuwait", flag: "🇰🇼", currency: "KWD", mic: "XKUW",
+      yahooSuffix: ".KW",
+      stocks: [
+        S("KFH",     "Kuwait Finance House",        0.760, 0.752, 0.754, 0.748, 0.768, 0.745, 9_870_000, 13_400_000_000),
+        S("NBK",     "National Bank of Kuwait",     0.910, 0.902, 0.904, 0.896, 0.918, 0.900, 7_120_000, 13_800_000_000),
+        S("ZAIN",    "Zain Group",                  0.555, 0.560, 0.558, 0.551, 0.564, 0.562, 4_540_000,  4_780_000_000),
+        S("BOUBYAN", "Boubyan Bank",                0.640, 0.634, 0.636, 0.630, 0.648, 0.628, 2_980_000,  4_150_000_000),
+        S("AGLTY",   "Agility Public Warehousing",  0.285, 0.288, 0.287, 0.283, 0.291, 0.290, 6_240_000,  3_120_000_000),
+        S("GBK",     "Gulf Bank",                   0.310, 0.307, 0.308, 0.305, 0.314, 0.306, 3_410_000,  1_980_000_000),
+        S("MABANEE", "Mabanee Company",             0.720, 0.714, 0.716, 0.710, 0.728, 0.708,   870_000,  2_040_000_000)
+      ]
+    },
+    {
+      id: "msx", name: "Muscat Stock Exchange (MSX)", short: "MSX",
+      country: "Oman", flag: "🇴🇲", currency: "OMR", mic: "XMUS",
+      yahooSuffix: ".OM",
+      stocks: [
+        S("BKMB",    "Bank Muscat",                 0.298, 0.295, 0.296, 0.293, 0.301, 0.294, 4_120_000, 2_240_000_000),
+        S("OQGN",    "OQ Gas Networks",             0.142, 0.140, 0.141, 0.139, 0.144, 0.139, 3_870_000, 1_540_000_000),
+        S("OMINVST", "Oman Investment & Finance",   0.120, 0.121, 0.120, 0.118, 0.123, 0.122, 1_240_000,   420_000_000),
+        S("OTEL",    "Omantel",                     0.880, 0.872, 0.874, 0.866, 0.892, 0.870,   640_000, 6_600_000_000),
+        S("OQEP",    "OQ Exploration & Production", 0.350, 0.347, 0.348, 0.344, 0.355, 0.346, 2_980_000, 4_560_000_000),
+        S("BKDB",    "Bank Dhofar",                 0.165, 0.164, 0.164, 0.162, 0.168, 0.163,   980_000,   500_000_000)
+      ]
+    },
+    {
+      id: "bahrain", name: "Bahrain Bourse", short: "Bahrain Bourse",
+      country: "Bahrain", flag: "🇧🇭", currency: "BHD", mic: "XBAH",
+      yahooSuffix: ".BH",
+      stocks: [
+        S("BBK",     "BBK (Bank of Bahrain & Kuwait)", 0.520, 0.516, 0.517, 0.512, 0.526, 0.514, 1_240_000, 760_000_000),
+        S("NBB",     "National Bank of Bahrain",        0.640, 0.634, 0.636, 0.630, 0.648, 0.632,   870_000, 1_120_000_000),
+        S("GFH",     "GFH Financial Group",             0.290, 0.292, 0.291, 0.287, 0.295, 0.293, 3_410_000, 1_080_000_000),
+        S("BATELCO", "Bahrain Telecom (Batelco)",       0.520, 0.515, 0.516, 0.510, 0.527, 0.512,   540_000,   860_000_000),
+        S("ALBH",    "Aluminium Bahrain (Alba)",        0.880, 0.872, 0.874, 0.866, 0.892, 0.868,   410_000, 1_250_000_000),
+        S("ZAINBH",  "Zain Bahrain",                    0.165, 0.166, 0.165, 0.163, 0.168, 0.167,   320_000,   240_000_000)
+      ]
+    }
+  ];
+
+  global.GCC_DATA = { EXCHANGES: EXCHANGES };
+})(window);
+
+
+/* ===== js/providers/base.js ===== */
+/*
+ * Provider framework (shared base) — loaded before any provider module.
+ *
+ * Each provider lives in its own file (mock.js, yahoo.js, twelvedata.js,
+ * eodhd.js) and self-registers here via GCC_PROVIDERS.register(...). They all
+ * share one contract:
+ *
+ *     getQuotes(exchange, apiKey) -> Promise<Array<stock>>
+ *
+ * where `stock` matches the shape S() produces in js/data.js. If a live call
+ * fails (network/CORS/missing key/uncovered exchange) the framework falls back
+ * to the mock provider so the UI always renders.
+ *
+ * `phase` metadata documents the rollout: phase 1 = free/offline defaults,
+ * phase 2 = live paid feed (Twelve Data).
+ */
+(function (global) {
+  "use strict";
+
+  function clone(stock) { return JSON.parse(JSON.stringify(stock)); }
+  function num(v) { var n = parseFloat(v); return isFinite(n) ? n : null; }
+  function defObj(k, v) { var o = {}; o[k] = v; return o; }
+
+  // Rebuild derived fields once a live provider supplies raw price points.
+  function normalize(raw) {
+    var prevClose = raw.prevClose != null ? raw.prevClose : raw.cmp;
+    var change = raw.cmp - prevClose;
+    var open = raw.open != null ? raw.open : raw.cmp;
+    return {
+      code: raw.code,
+      name: raw.name || raw.code,
+      cmp: raw.cmp,
+      change: change,
+      changePct: prevClose ? (change / prevClose) * 100 : 0,
+      opening: open,
+      closing: prevClose,
+      dayOpen: open,
+      dayClose: raw.cmp,
+      weekOpen: raw.weekOpen != null ? raw.weekOpen : open,
+      weekClose: raw.cmp,
+      sessionHigh: raw.high != null ? raw.high : raw.cmp,
+      sessionLow: raw.low != null ? raw.low : raw.cmp,
+      volume: raw.volume != null ? raw.volume : 0,
+      marketCap: raw.marketCap != null ? raw.marketCap : 0
+    };
+  }
+
+  var list = [];
+  var byId = {};
+
+  function register(provider) {
+    if (byId[provider.id]) return;
+    byId[provider.id] = provider;
+    list.push(provider);
+  }
+
+  function get(id) { return byId[id] || byId.mock; }
+
+  // Resolve a provider, run it, and fall back to mock on any error.
+  function fetchQuotes(providerId, exchange, apiKey) {
+    var p = get(providerId);
+    var run;
+    try {
+      run = p.getQuotes(exchange, apiKey);
+    } catch (e) {
+      run = Promise.reject(e);
+    }
+    return Promise.resolve(run).catch(function (err) {
+      console.warn("[providers] '" + providerId + "' failed, using sample data:", err && err.message);
+      return byId.mock.getQuotes(exchange).then(function (rows) {
+        rows._fellBack = true;
+        return rows;
+      });
+    });
+  }
+
+  global.GCC_PROVIDERS = {
+    list: list,
+    register: register,
+    get: get,
+    fetchQuotes: fetchQuotes,
+    helpers: { clone: clone, num: num, defObj: defObj, normalize: normalize }
+  };
+})(window);
+
+
+/* ===== js/providers/mock.js ===== */
+/*
+ * Mock provider — Phase 1 default.
+ *
+ * Serves the built-in sample dataset (js/data.js). No network, no key; always
+ * works, and acts as the fallback for every live provider.
+ */
+(function (global) {
+  "use strict";
+  var H = global.GCC_PROVIDERS.helpers;
+
+  global.GCC_PROVIDERS.register({
+    id: "mock",
+    label: "Sample data (offline)",
+    needsKey: false,
+    phase: 1,
+    note: "Built-in sample data. No network, no key — always works.",
+    getQuotes: function (exchange) {
+      return Promise.resolve(exchange.stocks.map(H.clone));
+    }
+  });
+})(window);
+
+
+/* ===== js/providers/yahoo.js ===== */
+/*
+ * Yahoo Finance provider — Phase 1 free live option (no API key).
+ *
+ * Covers Saudi (.SR), Qatar (.QA), Kuwait (.KW) well; UAE/Oman/Bahrain partial.
+ *
+ * Browser reality: Yahoo's endpoints don't send CORS headers, so a page opened
+ * directly (file:// or any other origin) can't call them straight. We therefore
+ * use the public `v8/finance/chart` endpoint *through a CORS proxy* so it works
+ * from a plain static page. Set CORS_PROXY to "" if you're calling from a
+ * context where Yahoo is reachable directly (server-side, or a CORS-disabling
+ * browser extension). Every symbol falls back to sample data on any error.
+ */
+(function (global) {
+  "use strict";
+  var P = global.GCC_PROVIDERS;
+  var H = P.helpers;
+
+  // Public CORS proxy (returns the raw upstream body). Swap or clear as needed.
+  var CORS_PROXY = "https://api.allorigins.win/raw?url=";
+  var CHART = "https://query1.finance.yahoo.com/v8/finance/chart/";
+
+  function chartUrl(symbol) {
+    var upstream = CHART + encodeURIComponent(symbol) + "?interval=1d&range=5d";
+    return CORS_PROXY ? CORS_PROXY + encodeURIComponent(upstream) : upstream;
+  }
+
+  function nums(arr) { return (arr || []).filter(function (v) { return v != null; }); }
+
+  function mapResult(stock, json) {
+    var res = json && json.chart && json.chart.result && json.chart.result[0];
+    if (!res || !res.meta || res.meta.regularMarketPrice == null) return H.clone(stock);
+    var m = res.meta;
+    var q = (res.indicators && res.indicators.quote && res.indicators.quote[0]) || {};
+    var opens = nums(q.open), highs = nums(q.high), lows = nums(q.low), vols = nums(q.volume);
+
+    return H.normalize({
+      code: stock.code,
+      name: stock.name,
+      cmp: m.regularMarketPrice,
+      prevClose: m.chartPreviousClose != null ? m.chartPreviousClose : m.previousClose,
+      open: opens.length ? opens[opens.length - 1] : null,        // today's open
+      high: m.regularMarketDayHigh != null ? m.regularMarketDayHigh : (highs.length ? Math.max.apply(null, highs) : null),
+      low: m.regularMarketDayLow != null ? m.regularMarketDayLow : (lows.length ? Math.min.apply(null, lows) : null),
+      weekOpen: opens.length ? opens[0] : null,                   // first open in the 5-day window
+      volume: m.regularMarketVolume != null ? m.regularMarketVolume : (vols.length ? vols[vols.length - 1] : 0),
+      marketCap: stock.marketCap                                  // chart endpoint has no cap; keep reference
+    });
+  }
+
+  P.register({
+    id: "yahoo",
+    label: "Yahoo Finance (free, no key)",
+    needsKey: false,
+    phase: 1,
+    note: "Free, no key — covers Saudi/Qatar/Kuwait (UAE/Oman/Bahrain partial). Routed via a CORS proxy so it works from a static page.",
+    getQuotes: function (exchange) {
+      if (!exchange.yahooSuffix) return P.get("mock").getQuotes(exchange);
+      return Promise.all(exchange.stocks.map(function (s) {
+        return fetch(chartUrl(s.code + exchange.yahooSuffix))
+          .then(function (r) { if (!r.ok) throw new Error("Yahoo HTTP " + r.status); return r.json(); })
+          .then(function (json) { return mapResult(s, json); })
+          .catch(function () { return H.clone(s); }); // per-symbol fallback to sample
+      }));
+    }
+  });
+})(window);
+
+
+/* ===== js/providers/twelvedata.js ===== */
+/*
+ * Twelve Data provider — PHASE 2 live feed.
+ *
+ * This is the designated Phase-2 data source. Requires a Twelve Data API key,
+ * entered in the Settings dialog and stored only in the browser's localStorage
+ * (never committed to the repo). GCC equities require the Grow plan ($29/mo) or
+ * higher — the free tier returns US/FX/crypto only.
+ *
+ * Uses the batch /quote endpoint scoped by each exchange's MIC code (XSAU,
+ * XDFM, XADS, DSMD, XKUW, XMUS, XBAH). Confirm symbol/MIC formatting against
+ * your account if a market returns empty.
+ *
+ * NOTE: outbound calls to api.twelvedata.com must be reachable — from a browser
+ * (subject to CORS) or, in a sandboxed environment, by adding the host to the
+ * network egress allowlist.
+ */
+(function (global) {
+  "use strict";
+  var P = global.GCC_PROVIDERS;
+  var H = P.helpers;
+
+  var BASE = "https://api.twelvedata.com";
+
+  P.register({
+    id: "twelvedata",
+    label: "Twelve Data — live (Phase 2)",
+    needsKey: true,
+    phase: 2,
+    // Prefilled demo key (free tier). Used when no key is saved in localStorage.
+    // GCC equities still require the Grow plan ($29/mo)+ — the demo key returns
+    // US/FX/crypto only. Replace via the Settings dialog with your own key.
+    defaultKey: "0d20071312944c31ac2a32ebc81c2cb1",
+    note: "Phase-2 live feed. Demo key prefilled; GCC equities require the Grow plan ($29/mo)+.",
+    getQuotes: function (exchange, apiKey) {
+      if (!apiKey) return P.get("mock").getQuotes(exchange);
+      var symbols = exchange.stocks.map(function (s) { return s.code; }).join(",");
+      var url = BASE + "/quote?symbol=" + encodeURIComponent(symbols) +
+                "&mic_code=" + encodeURIComponent(exchange.mic) +
+                "&apikey=" + encodeURIComponent(apiKey);
+      return fetch(url)
+        .then(function (r) { return r.json(); })
+        .then(function (json) {
+          if (json && json.status === "error") {
+            throw new Error(json.message || "Twelve Data error");
+          }
+          // Single symbol -> object; multiple -> { CODE: {...} }
+          var map = json && json.symbol ? H.defObj(json.symbol, json) : (json || {});
+          return exchange.stocks.map(function (s) {
+            var q = map[s.code];
+            if (!q || q.close == null) return H.clone(s);
+            return H.normalize({
+              code: s.code,
+              name: q.name || s.name,
+              cmp: H.num(q.close),
+              prevClose: H.num(q.previous_close),
+              open: H.num(q.open),
+              high: H.num(q.high),
+              low: H.num(q.low),
+              volume: H.num(q.volume),
+              marketCap: s.marketCap // not in /quote; keep reference value
+            });
+          });
+        });
+    }
+  });
+})(window);
+
+
+/* ===== js/providers/eodhd.js ===== */
+/*
+ * EODHD provider — optional paid alternative.
+ *
+ * Cheapest broad official coverage (~$20/mo), incl. Tadawul. Requires an API
+ * key (Settings dialog, localStorage only). EODHD uses SYMBOL.EXCHANGECODE;
+ * this reuses the Yahoo-style suffix without the dot as a best-effort default —
+ * confirm the exact exchange code in your EODHD account if a market is empty.
+ */
+(function (global) {
+  "use strict";
+  var P = global.GCC_PROVIDERS;
+  var H = P.helpers;
+
+  P.register({
+    id: "eodhd",
+    label: "EODHD (API key)",
+    needsKey: true,
+    phase: 2,
+    note: "Cheapest broad coverage (~$20/mo); confirm exchange suffixes in your account.",
+    getQuotes: function (exchange, apiKey) {
+      if (!apiKey) return P.get("mock").getQuotes(exchange);
+      var ex = (exchange.yahooSuffix || "").replace(".", "");
+      var tickers = exchange.stocks
+        .map(function (s) { return s.code + "." + ex; })
+        .join(",");
+      var primary = exchange.stocks[0].code + "." + ex;
+      var url = "https://eodhd.com/api/real-time/" + encodeURIComponent(primary) +
+                "?s=" + encodeURIComponent(tickers) +
+                "&fmt=json&api_token=" + encodeURIComponent(apiKey);
+      return fetch(url)
+        .then(function (r) { return r.json(); })
+        .then(function (json) {
+          var rows = Array.isArray(json) ? json : [json];
+          var byCode = {};
+          rows.forEach(function (q) {
+            byCode[String(q.code || "").split(".")[0]] = q;
+          });
+          return exchange.stocks.map(function (s) {
+            var q = byCode[s.code];
+            if (!q || q.close == null || q.close === "NA") return H.clone(s);
+            return H.normalize({
+              code: s.code,
+              name: s.name,
+              cmp: H.num(q.close),
+              prevClose: H.num(q.previousClose),
+              open: H.num(q.open),
+              high: H.num(q.high),
+              low: H.num(q.low),
+              volume: H.num(q.volume),
+              marketCap: s.marketCap
+            });
+          });
+        });
+    }
+  });
+})(window);
+
+
+/* ===== js/app.js ===== */
+/*
+ * GCC Stock Market Dashboard — UI controller.
+ *
+ * Renders exchange tabs and a sortable/searchable stock table with every
+ * requested column, pulling rows from the active data provider (default: mock).
+ * Provider + API key are chosen in the Settings dialog and persisted in
+ * localStorage.
+ */
+(function () {
+  "use strict";
+
+  var EXCHANGES = window.GCC_DATA.EXCHANGES;
+  var PROVIDERS = window.GCC_PROVIDERS;
+
+  var LS_PROVIDER = "gcc.provider";
+  var LS_KEY_PREFIX = "gcc.key.";
+
+  // Column definitions: key, header label, numeric?, money?, and the matching
+  // requirement from the brief.
+  var COLUMNS = [
+    { key: "code",        label: "Code",        type: "text" },
+    { key: "name",        label: "Name",        type: "text" },
+    { key: "cmp",         label: "CMP",         type: "money" },
+    { key: "changePct",   label: "Chg %",       type: "pct" },
+    { key: "opening",     label: "Opening",     type: "money" },
+    { key: "closing",     label: "Closing",     type: "money" },
+    { key: "dayOpen",     label: "Day Open",    type: "money" },
+    { key: "dayClose",    label: "Day Close",   type: "money" },
+    { key: "weekOpen",    label: "Wk Open",     type: "money" },
+    { key: "weekClose",   label: "Wk Close",    type: "money" },
+    { key: "sessionHigh", label: "Sess. High",  type: "money" },
+    { key: "sessionLow",  label: "Sess. Low",   type: "money" },
+    { key: "volume",      label: "Volume",      type: "int" },
+    { key: "marketCap",   label: "Mkt Cap",     type: "cap" }
+  ];
+
+  var els = {
+    tabs: document.getElementById("exchange-tabs"),
+    title: document.getElementById("market-title"),
+    sub: document.getElementById("market-sub"),
+    search: document.getElementById("search-input"),
+    updated: document.getElementById("updated-at"),
+    thead: document.getElementById("stock-thead"),
+    tbody: document.getElementById("stock-tbody"),
+    tableEmpty: document.getElementById("table-empty"),
+    sourceBadge: document.getElementById("source-badge"),
+    refreshBtn: document.getElementById("refresh-btn"),
+    settingsBtn: document.getElementById("settings-btn"),
+    // modal
+    modal: document.getElementById("settings-modal"),
+    providerSelect: document.getElementById("provider-select"),
+    apikeyField: document.getElementById("apikey-field"),
+    apikeyInput: document.getElementById("apikey-input"),
+    providerNote: document.getElementById("provider-note"),
+    settingsClose: document.getElementById("settings-close"),
+    settingsCancel: document.getElementById("settings-cancel"),
+    settingsSave: document.getElementById("settings-save")
+  };
+
+  var state = {
+    exchangeId: EXCHANGES[0].id,
+    providerId: localStorage.getItem(LS_PROVIDER) || "yahoo",
+    rows: [],
+    sortKey: "marketCap",
+    sortDir: -1, // -1 desc, 1 asc
+    search: ""
+  };
+
+  /* ---------------- formatting ---------------- */
+
+  function exchange() {
+    return EXCHANGES.filter(function (e) { return e.id === state.exchangeId; })[0];
+  }
+
+  function fmtMoney(v, ccy) {
+    if (v == null || !isFinite(v)) return "—";
+    var dp = v < 10 ? 3 : 2;
+    return v.toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp }) + " " + ccy;
+  }
+
+  function fmtInt(v) {
+    if (v == null || !isFinite(v)) return "—";
+    return Math.round(v).toLocaleString("en-US");
+  }
+
+  function fmtCap(v, ccy) {
+    if (v == null || !isFinite(v)) return "—";
+    var abs = Math.abs(v), unit = "", div = 1;
+    if (abs >= 1e12) { unit = "T"; div = 1e12; }
+    else if (abs >= 1e9) { unit = "B"; div = 1e9; }
+    else if (abs >= 1e6) { unit = "M"; div = 1e6; }
+    return (v / div).toFixed(2) + unit + " " + ccy;
+  }
+
+  function fmtPct(v) {
+    if (v == null || !isFinite(v)) return "—";
+    return (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
+  }
+
+  function fmtCell(col, row, ccy) {
+    switch (col.type) {
+      case "money": return fmtMoney(row[col.key], ccy);
+      case "int":   return fmtInt(row[col.key]);
+      case "cap":   return fmtCap(row[col.key], ccy);
+      case "pct":   return fmtPct(row[col.key]);
+      default:      return row[col.key] != null ? String(row[col.key]) : "—";
+    }
+  }
+
+  /* ---------------- rendering ---------------- */
+
+  function renderTabs() {
+    els.tabs.innerHTML = "";
+    EXCHANGES.forEach(function (ex) {
+      var btn = document.createElement("button");
+      btn.className = "tab" + (ex.id === state.exchangeId ? " is-active" : "");
+      btn.type = "button";
+      btn.innerHTML = '<span class="tab-flag">' + ex.flag + '</span>' +
+                      '<span class="tab-name">' + ex.short + '</span>' +
+                      '<span class="tab-ccy">' + ex.currency + '</span>';
+      btn.addEventListener("click", function () { selectExchange(ex.id); });
+      els.tabs.appendChild(btn);
+    });
+  }
+
+  function renderHead() {
+    var tr = document.createElement("tr");
+    COLUMNS.forEach(function (col) {
+      var th = document.createElement("th");
+      th.textContent = col.label;
+      th.className = "th-" + col.type + (col.key === state.sortKey ? " is-sorted" : "");
+      if (col.key === state.sortKey) {
+        th.setAttribute("aria-sort", state.sortDir === 1 ? "ascending" : "descending");
+        th.innerHTML = col.label + ' <span class="sort-caret">' + (state.sortDir === 1 ? "▲" : "▼") + "</span>";
+      }
+      th.addEventListener("click", function () { toggleSort(col.key); });
+      tr.appendChild(th);
+    });
+    els.thead.innerHTML = "";
+    els.thead.appendChild(tr);
+  }
+
+  function visibleRows() {
+    var q = state.search.trim().toLowerCase();
+    var rows = state.rows.filter(function (r) {
+      if (!q) return true;
+      return r.code.toLowerCase().indexOf(q) !== -1 ||
+             r.name.toLowerCase().indexOf(q) !== -1;
+    });
+    var key = state.sortKey, dir = state.sortDir;
+    rows.sort(function (a, b) {
+      var av = a[key], bv = b[key];
+      if (typeof av === "string") return av.localeCompare(bv) * dir;
+      return ((av || 0) - (bv || 0)) * dir;
+    });
+    return rows;
+  }
+
+  function renderBody() {
+    var ccy = exchange().currency;
+    var rows = visibleRows();
+    els.tbody.innerHTML = "";
+    els.tableEmpty.hidden = rows.length !== 0;
+
+    rows.forEach(function (row) {
+      var tr = document.createElement("tr");
+      COLUMNS.forEach(function (col) {
+        var td = document.createElement("td");
+        td.className = "td-" + col.type;
+        td.textContent = fmtCell(col, row, ccy);
+        if (col.key === "changePct") {
+          td.classList.add(row.changePct > 0 ? "up" : (row.changePct < 0 ? "down" : "flat"));
+        }
+        if (col.key === "name") td.classList.add("td-name");
+        if (col.key === "code") td.classList.add("td-code");
+        tr.appendChild(td);
+      });
+      els.tbody.appendChild(tr);
+    });
+  }
+
+  function renderMeta(fellBack) {
+    var ex = exchange();
+    els.title.textContent = ex.flag + " " + ex.name;
+    els.sub.textContent = ex.country + " · prices in " + ex.currency + " · " + ex.stocks.length + " listed";
+    var p = providerById(state.providerId);
+    els.sourceBadge.textContent = (fellBack ? "Sample (fallback)" : p.label);
+    els.sourceBadge.classList.toggle("is-live", !fellBack && p.id !== "mock");
+  }
+
+  /* ---------------- data flow ---------------- */
+
+  function providerById(id) {
+    return PROVIDERS.list.filter(function (p) { return p.id === id; })[0] || PROVIDERS.list[0];
+  }
+
+  function currentKey() {
+    var stored = localStorage.getItem(LS_KEY_PREFIX + state.providerId);
+    if (stored) return stored;
+    return providerById(state.providerId).defaultKey || "";
+  }
+
+  function loadQuotes() {
+    var ex = exchange();
+    els.updated.textContent = "loading…";
+    PROVIDERS.fetchQuotes(state.providerId, ex, currentKey()).then(function (rows) {
+      state.rows = rows;
+      renderHead();
+      renderBody();
+      renderMeta(!!rows._fellBack);
+      els.updated.textContent = "Updated " + new Date().toLocaleTimeString();
+    });
+  }
+
+  function selectExchange(id) {
+    state.exchangeId = id;
+    renderTabs();
+    loadQuotes();
+  }
+
+  function toggleSort(key) {
+    if (state.sortKey === key) state.sortDir *= -1;
+    else { state.sortKey = key; state.sortDir = (key === "code" || key === "name") ? 1 : -1; }
+    renderHead();
+    renderBody();
+  }
+
+  /* ---------------- settings modal ---------------- */
+
+  function openSettings() {
+    els.providerSelect.innerHTML = "";
+    PROVIDERS.list.forEach(function (p) {
+      var opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = p.label;
+      els.providerSelect.appendChild(opt);
+    });
+    els.providerSelect.value = state.providerId;
+    syncModalForProvider();
+    els.modal.hidden = false;
+  }
+
+  function syncModalForProvider() {
+    var p = providerById(els.providerSelect.value);
+    els.apikeyField.style.display = p.needsKey ? "" : "none";
+    els.apikeyInput.value = localStorage.getItem(LS_KEY_PREFIX + p.id) || p.defaultKey || "";
+    els.providerNote.textContent = p.note || "";
+  }
+
+  function closeSettings() { els.modal.hidden = true; }
+
+  function saveSettings() {
+    var p = providerById(els.providerSelect.value);
+    state.providerId = p.id;
+    localStorage.setItem(LS_PROVIDER, p.id);
+    if (p.needsKey) localStorage.setItem(LS_KEY_PREFIX + p.id, els.apikeyInput.value.trim());
+    closeSettings();
+    loadQuotes();
+  }
+
+  /* ---------------- wiring ---------------- */
+
+  els.search.addEventListener("input", function () {
+    state.search = this.value;
+    renderBody();
+  });
+  els.refreshBtn.addEventListener("click", loadQuotes);
+  els.settingsBtn.addEventListener("click", openSettings);
+  els.settingsClose.addEventListener("click", closeSettings);
+  els.settingsCancel.addEventListener("click", closeSettings);
+  els.settingsSave.addEventListener("click", saveSettings);
+  els.providerSelect.addEventListener("change", syncModalForProvider);
+  els.modal.addEventListener("click", function (e) {
+    if (e.target === els.modal) closeSettings();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !els.modal.hidden) closeSettings();
+  });
+
+  /* ---------------- init ---------------- */
+  renderTabs();
+  loadQuotes();
+})();
+
+</script>
+</body>
+</html>
