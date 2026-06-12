@@ -1,0 +1,12 @@
+{
+  "name": "gcc-markets-dashboard",
+  "version": "1.0.0",
+  "description": "Dashboard listing stocks across the GCC exchanges (Tadawul, DFM, ADX, QSE, Boursa Kuwait, MSX, Bahrain Bourse) with pluggable data providers.",
+  "private": true,
+  "scripts": {
+    "start": "python3 serve.py",
+    "serve": "python3 serve.py",
+    "test": "node tests/run.js"
+  },
+  "license": "MIT"
+}

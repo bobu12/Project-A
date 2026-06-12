@@ -33,6 +33,17 @@ python3 -m http.server 8000
 
 Tab between exchanges, search by name/code, and click any column header to sort.
 
+## Test
+
+A dependency-free test suite checks data integrity, provider registration, and
+the live→sample fallback:
+
+```bash
+node tests/run.js     # or:  npm test
+```
+
+Expected: `50 passed, 0 failed · ✓ ALL TESTS PASSED`.
+
 ## Data sources — phased & modular
 
 The app runs on **sample data** out of the box so it works offline with no
